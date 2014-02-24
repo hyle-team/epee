@@ -194,7 +194,6 @@ namespace net_utils
 		adr.sin_addr.s_addr = htonl(INADDR_ANY);
 		adr.sin_port = (u_short)htons(port_no);
 
-		//Биндим
 		err = bind(m_listen_socket, (const sockaddr*)&adr, sizeof(adr ));
 		if(SOCKET_ERROR == err )
 		{
@@ -249,8 +248,6 @@ namespace net_utils
 	template<class THandler>
 	bool abstract_tcp_server<THandler>::run_server()
 	{
-
-		//Ставим в состояние прослушки
 		int err = listen(m_listen_socket, 10000);
 		if(SOCKET_ERROR == err )
 		{

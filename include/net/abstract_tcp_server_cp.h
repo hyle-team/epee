@@ -145,7 +145,6 @@ PRAGMA_WARNING_DISABLE_VS(4355)
 				memcpy(m_psend_data->DataBuf.buf, ptr, cb);
 				m_psend_data->m_op_type = op_type_send;
 				InterlockedExchange(&m_psend_data->m_is_in_use, 1);
-				//Выполняем вызов WSASend() и переходим опять к ожиданию завершения 
 				DWORD bytes_sent = 0;
 				DWORD flags = 0;
 				int res = 0;
@@ -158,7 +157,6 @@ PRAGMA_WARNING_DISABLE_VS(4355)
 				{
 					int err = ::WSAGetLastError();
 					if(WSA_IO_PENDING == err )
-					{//Ушли в пендинг, отлично, снимаемся
 						return true;
 					}
 					LOG_ERROR("BIG FAIL: WSASend error code not correct, res=" << res << " last_err=" << err);
@@ -167,16 +165,16 @@ PRAGMA_WARNING_DISABLE_VS(4355)
 					//closesocket(m_psend_data);
 					return false;
 				}else if(0 == res)
-				{//Похоже что операция закончилась сразу, незамедлительно
+				{
 					::InterlockedExchange(&m_psend_data->m_is_in_use, 0);
 					if(!bytes_sent || bytes_sent != cb)
-					{//Но как-то неудачно
+					{
 						int err = ::WSAGetLastError();
 						LOG_ERROR("BIG FAIL: WSASend immediatly complete? but bad results, res=" << res << " last_err=" << err);
 						query_shutdown();
 						return false;
 					}else
-					{//И вполне удачно
+					{
 						return true;
 					}
 				}

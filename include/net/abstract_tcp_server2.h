@@ -117,7 +117,6 @@ namespace net_utils
 
     t_connection_context context;
     volatile boost::uint32_t m_want_close_connection;
-    volatile boost::uint32_t m_last_send_op_success;
     std::atomic<bool> m_was_shutdown;
     critical_section m_send_que_lock;
     std::list<std::string> m_send_que;
@@ -160,6 +159,8 @@ namespace net_utils
 
     /// Stop the server.
     void send_stop_signal();
+
+    bool is_stop_signal_sent();
 
     void set_threads_prefix(const std::string& prefix_name);
 

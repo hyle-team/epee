@@ -122,12 +122,14 @@ namespace net_utils
 #define LOG_PRINT_CC(ct, message, log_level) LOG_PRINT("[" << epee::net_utils::print_connection_context_short(ct) << "]" << message, log_level)
 #define LOG_PRINT_CC_GREEN(ct, message, log_level) LOG_PRINT_GREEN("[" << epee::net_utils::print_connection_context_short(ct) << "]" << message, log_level)
 #define LOG_PRINT_CC_RED(ct, message, log_level) LOG_PRINT_RED("[" << epee::net_utils::print_connection_context_short(ct) << "]" << message, log_level)
+#define LOG_PRINT_CC_BLUE(ct, message, log_level) LOG_PRINT_BLUE("[" << epee::net_utils::print_connection_context_short(ct) << "]" << message, log_level)
 #define LOG_ERROR_CC(ct, message) LOG_ERROR("[" << epee::net_utils::print_connection_context_short(ct) << "]" << message)
 
 #define LOG_PRINT_CC_L0(ct, message) LOG_PRINT_L0("[" << epee::net_utils::print_connection_context_short(ct) << "]" << message)
 #define LOG_PRINT_CC_L1(ct, message) LOG_PRINT_L1("[" << epee::net_utils::print_connection_context_short(ct) << "]" << message)
 #define LOG_PRINT_CC_L2(ct, message) LOG_PRINT_L2("[" << epee::net_utils::print_connection_context_short(ct) << "]" << message)
 #define LOG_PRINT_CC_L3(ct, message) LOG_PRINT_L3("[" << epee::net_utils::print_connection_context_short(ct) << "]" << message)
+#define LOG_PRINT_CC_L4(ct, message) LOG_PRINT_L4("[" << epee::net_utils::print_connection_context_short(ct) << "]" << message)
 
 #define LOG_PRINT_CCONTEXT_L0(message) LOG_PRINT_CC_L0(context, message)
 #define LOG_PRINT_CCONTEXT_L1(message) LOG_PRINT_CC_L1(context, message)
@@ -137,6 +139,7 @@ namespace net_utils
  
 #define LOG_PRINT_CCONTEXT_GREEN(message, log_level) LOG_PRINT_CC_GREEN(context, message, log_level)
 #define LOG_PRINT_CCONTEXT_RED(message, log_level) LOG_PRINT_CC_RED(context, message, log_level)
+#define LOG_PRINT_CCONTEXT_BLUE(message, log_level) LOG_PRINT_CC_BLUE(context, message, log_level) 
 
 #define CHECK_AND_ASSERT_MES_CC(condition, return_val, err_message) CHECK_AND_ASSERT_MES(condition, return_val, "[" << epee::net_utils::print_connection_context_short(context) << "]" << err_message)
 

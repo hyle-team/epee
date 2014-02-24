@@ -67,6 +67,7 @@ namespace levin
 #pragma pack(pop)
 
 
+#define LEVIN_DEFAULT_TIMEOUT_PRECONFIGURED 0
 #define LEVIN_DEFAULT_MAX_PACKET_SIZE 100000000      //100MB by default
 
 #define LEVIN_PACKET_REQUEST			0x00000001
@@ -75,16 +76,6 @@ namespace levin
 
 #define LEVIN_PROTOCOL_VER_0         0
 #define LEVIN_PROTOCOL_VER_1         1
-
-
-#define LEVIN_OK                                        0
-#define LEVIN_ERROR_CONNECTION                         -1
-#define LEVIN_ERROR_CONNECTION_NOT_FOUND               -2
-#define LEVIN_ERROR_CONNECTION_DESTROYED               -3
-#define LEVIN_ERROR_CONNECTION_TIMEDOUT                -4
-#define LEVIN_ERROR_CONNECTION_NO_DUPLEX_PROTOCOL      -5
-#define LEVIN_ERROR_CONNECTION_HANDLER_NOT_DEFINED     -6
-#define LEVIN_ERROR_FORMAT                             -7
  
   template<class t_connection_context = net_utils::connection_context_base>
   struct levin_commands_handler
@@ -97,6 +88,36 @@ namespace levin
     virtual void on_connection_close(t_connection_context& context){};
 
   };
+
+#define LEVIN_OK                                        0
+#define LEVIN_ERROR_CONNECTION                         -1
+#define LEVIN_ERROR_CONNECTION_NOT_FOUND               -2
+#define LEVIN_ERROR_CONNECTION_DESTROYED               -3
+#define LEVIN_ERROR_CONNECTION_TIMEDOUT                -4
+#define LEVIN_ERROR_CONNECTION_NO_DUPLEX_PROTOCOL      -5
+#define LEVIN_ERROR_CONNECTION_HANDLER_NOT_DEFINED     -6
+#define LEVIN_ERROR_FORMAT                             -7
+
+#define DESCRIBE_RET_CODE(code) case code: return #code;
+
+  const char* get_err_descr(int err)
+  {
+    switch(err)
+    {
+      DESCRIBE_RET_CODE(LEVIN_OK);
+      DESCRIBE_RET_CODE(LEVIN_ERROR_CONNECTION);
+      DESCRIBE_RET_CODE(LEVIN_ERROR_CONNECTION_NOT_FOUND);
+      DESCRIBE_RET_CODE(LEVIN_ERROR_CONNECTION_DESTROYED);
+      DESCRIBE_RET_CODE(LEVIN_ERROR_CONNECTION_TIMEDOUT);
+      DESCRIBE_RET_CODE(LEVIN_ERROR_CONNECTION_NO_DUPLEX_PROTOCOL);
+      DESCRIBE_RET_CODE(LEVIN_ERROR_CONNECTION_HANDLER_NOT_DEFINED);
+      DESCRIBE_RET_CODE(LEVIN_ERROR_FORMAT);
+    default:
+      return "unknown code";
+    }
+  }
+
+
 }
 }
 

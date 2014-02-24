@@ -103,7 +103,7 @@ namespace epee
       req_t.method = method_name;
       req_t.version = "2.0";
       epee::json_rpc::response<t_response, epee::json_rpc::error> resp_t = AUTO_VAL_INIT(resp_t);
-      if(!epee::net_utils::invoke_http_json_remote_command2(url, req_t, resp_t, transport, timeout, method_name))
+      if(!epee::net_utils::invoke_http_json_remote_command2(url, req_t, resp_t, transport, timeout, http_method))
       {
         return false;
       }

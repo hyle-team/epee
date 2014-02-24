@@ -210,6 +210,21 @@ namespace epee
     std::unique_ptr<boost::thread> m_console_thread;
     command_handlers_map m_command_handlers;
   public: 
+    std::string get_usage()
+    {
+      std::stringstream ss;
+      size_t max_command_len = 0;
+      for(auto& x:m_command_handlers)
+        if(x.first.size() > max_command_len)
+          max_command_len = x.first.size();
+             
+      for(auto& x:m_command_handlers)
+      {
+        ss.width(max_command_len + 3);
+        ss << std::left <<  x.first << x.second.second << ENDL;
+      }
+      return ss.str();
+    }
     void set_handler(const std::string& cmd, const console_command_handler& hndlr, const std::string& usage = "")
     {
       command_handlers_map::mapped_type & vt = m_command_handlers[cmd];

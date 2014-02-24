@@ -55,11 +55,12 @@ PRAGMA_WARNING_DISABLE_VS(4355)
                             //context(typename boost::value_initialized<t_connection_context>())
                             m_protocol_handler(this, config, context), 
                             m_want_close_connection(0), 
-                            m_last_send_op_success(0), 
                             m_was_shutdown(0), 
                             m_ref_sockets_count(sock_count), 
                             m_pfilter(pfilter)
-  {}
+  {
+    boost::interprocess::ipcdetail::atomic_inc32(&m_ref_sockets_count);
+  }
 PRAGMA_WARNING_DISABLE_VS(4355)
   //---------------------------------------------------------------------------------
   template<class t_protocol_handler>
@@ -86,14 +87,7 @@ PRAGMA_WARNING_DISABLE_VS(4355)
   {
     TRY_ENTRY();
 
-    boost::interprocess::ipcdetail::atomic_inc32(&m_ref_sockets_count);
-
     m_is_multithreaded = is_multithreaded;
-    /*
-    context.m_connection_id = boost::uuids::random_generator()();
-    context.m_is_income = is_income;
-    context.m_remote_ip = boost::asio::detail::socket_ops::host_to_network_long(socket_.remote_endpoint().address().to_v4().to_ulong());
-    context.m_remote_port = socket_.remote_endpoint().port();*/
 
     boost::system::error_code ec;
     auto remote_ep = socket_.remote_endpoint(ec);
@@ -165,11 +159,12 @@ PRAGMA_WARNING_DISABLE_VS(4355)
   bool connection<t_protocol_handler>::release()
   {
     TRY_ENTRY();
+    boost::shared_ptr<connection<t_protocol_handler> >  back_connection_copy;
     LOG_PRINT_L4("[sock " << socket_.native_handle() << "] release");
     CRITICAL_REGION_BEGIN(m_self_refs_lock);
     CHECK_AND_ASSERT_MES(m_self_refs.size(), false, "[sock " << socket_.native_handle() << "] m_self_refs empty at connection<t_protocol_handler>::release() call");
     //erasing from container without additional copy can cause start deleting object, including m_self_refs
-    boost::shared_ptr<connection<t_protocol_handler> >  back_connection_copy = m_self_refs.back();
+    back_connection_copy = m_self_refs.back();
     m_self_refs.pop_back();
     CRITICAL_REGION_END();
     return true;
@@ -191,7 +186,7 @@ PRAGMA_WARNING_DISABLE_VS(4355)
   {
     TRY_ENTRY();
     LOG_PRINT_L4("[sock " << socket_.native_handle() << "] Assync read calledback.");
-    
+
     if (!e)
     {
       /**/
@@ -204,13 +199,14 @@ PRAGMA_WARNING_DISABLE_VS(4355)
         LOG_PRINT("[sock " << socket_.native_handle() << "] protocol_want_close", LOG_LEVEL_4);
 
         //some error in protocol, protocol handler ask to close connection
-        CRITICAL_REGION_BEGIN(m_send_que_lock);
         boost::interprocess::ipcdetail::atomic_write32(&m_want_close_connection, 1);
+        bool do_shutdown = false;
+        CRITICAL_REGION_BEGIN(m_send_que_lock);
         if(!m_send_que.size())
-        {
-          shutdown();
-        }
+          do_shutdown = true;
         CRITICAL_REGION_END();
+        if(do_shutdown)
+          shutdown();
       }else
       {
         socket_.async_read_some(boost::asio::buffer(buffer_),
@@ -222,10 +218,11 @@ PRAGMA_WARNING_DISABLE_VS(4355)
       }
     }else
     {
-      LOG_PRINT_L3("[sock " << socket_.native_handle() << "] Some not success at read: " << e.message());
+      LOG_PRINT_L3("[sock " << socket_.native_handle() << "] Some not success at read: " << e.message() << ':' << e.value());
       if(e.value() != 2)
-      {  
-        LOG_PRINT_L3("[sock " << socket_.native_handle() << "] Some problems at read: " << e.message());
+      {
+        LOG_PRINT_L3("[sock " << socket_.native_handle() << "] Some problems at read: " << e.message() << ':' << e.value());
+        shutdown();
       }
     }
     // If an error occurs then no new asynchronous operations are started. This
@@ -272,9 +269,10 @@ PRAGMA_WARNING_DISABLE_VS(4355)
     //some data should be wrote to stream
     //request complete
     
-    CRITICAL_REGION_BEGIN(m_send_que_lock);
+    epee::critical_region_t<decltype(m_send_que_lock)> send_guard(m_send_que_lock);
     if(m_send_que.size() > ABSTRACT_SERVER_SEND_QUE_MAX_COUNT)
     {
+      send_guard.unlock();
       LOG_ERROR("send que size is more than ABSTRACT_SERVER_SEND_QUE_MAX_COUNT(" << ABSTRACT_SERVER_SEND_QUE_MAX_COUNT << "), shutting down connection");
       close();
       return false;
@@ -300,11 +298,9 @@ PRAGMA_WARNING_DISABLE_VS(4355)
         boost::bind(&connection<t_protocol_handler>::handle_write, connection<t_protocol_handler>::shared_from_this(), _1, _2)
         //)
         );
-      
+
       LOG_PRINT_L4("[sock " << socket_.native_handle() << "] Assync send requested " << m_send_que.front().size());
     }
-
-    CRITICAL_REGION_END();
 
     return true;
 
@@ -327,13 +323,16 @@ PRAGMA_WARNING_DISABLE_VS(4355)
   {
     TRY_ENTRY();
     LOG_PRINT_L4("[sock " << socket_.native_handle() << "] Que Shutdown called.");
+    size_t send_que_size = 0;
     CRITICAL_REGION_BEGIN(m_send_que_lock);
+    send_que_size = m_send_que.size();
+    CRITICAL_REGION_END();
     boost::interprocess::ipcdetail::atomic_write32(&m_want_close_connection, 1);
-    if(!m_send_que.size())
+    if(!send_que_size)
     {
       shutdown();
     }
-    CRITICAL_REGION_END();
+    
     return true;
     CATCH_ENTRY_L0("connection<t_protocol_handler>::close", false);
   }
@@ -344,19 +343,27 @@ PRAGMA_WARNING_DISABLE_VS(4355)
     TRY_ENTRY();
     LOG_PRINT_L4("[sock " << socket_.native_handle() << "] Assync send calledback " << cb);
 
+    if (e)
+    {
+      LOG_PRINT_L0("[sock " << socket_.native_handle() << "] Some problems at write: " << e.message() << ':' << e.value());
+      shutdown();
+      return;
+    }
+
+    bool do_shutdown = false;
     CRITICAL_REGION_BEGIN(m_send_que_lock);
-    if(!m_send_que.size())
+    if(m_send_que.empty())
     {
       LOG_ERROR("[sock " << socket_.native_handle() << "] m_send_que.size() == 0 at handle_write!");
       return;
     }
 
     m_send_que.pop_front();
-    if(!m_send_que.size())
+    if(m_send_que.empty())
     {
       if(boost::interprocess::ipcdetail::atomic_read32(&m_want_close_connection))
       {
-        shutdown();
+        do_shutdown = true;
       }
     }else
     {
@@ -366,22 +373,12 @@ PRAGMA_WARNING_DISABLE_VS(4355)
           boost::bind(&connection<t_protocol_handler>::handle_write, connection<t_protocol_handler>::shared_from_this(), _1, _2));
         //);
     }
+    CRITICAL_REGION_END();
 
-    if (!e)
-    {
-       boost::interprocess::ipcdetail::atomic_write32(&m_last_send_op_success, 1);
-    }
-    else
-    {
-      LOG_PRINT_L0("[sock " << socket_.native_handle() << "]Some problems at write: " << e.message());
-      boost::interprocess::ipcdetail::atomic_write32(&m_last_send_op_success, 0);
-    } 
-
-    if(e || (boost::interprocess::ipcdetail::atomic_read32(&m_want_close_connection) && !m_send_que.size()))
+    if(do_shutdown)
     {
       shutdown();
     }
-    CRITICAL_REGION_END();
     CATCH_ENTRY_L0("connection<t_protocol_handler>::handle_write", void());
   }
   /************************************************************************/
@@ -440,6 +437,8 @@ PRAGMA_WARNING_DISABLE_VS(4355)
     CATCH_ENTRY_L0("boosted_tcp_server<t_protocol_handler>::init_server", false);
   }
   //-----------------------------------------------------------------------------
+PUSH_WARNINGS
+DISABLE_GCC_WARNING(maybe-uninitialized)
   template<class t_protocol_handler>
   bool boosted_tcp_server<t_protocol_handler>::init_server(const std::string port, const std::string& address) 
   {
@@ -451,6 +450,7 @@ PRAGMA_WARNING_DISABLE_VS(4355)
     }
     return this->init_server(p, address);
   }
+POP_WARNINGS
   //---------------------------------------------------------------------------------
   template<class t_protocol_handler>
   bool boosted_tcp_server<t_protocol_handler>::worker_thread()
@@ -584,6 +584,12 @@ PRAGMA_WARNING_DISABLE_VS(4355)
   }
   //---------------------------------------------------------------------------------
   template<class t_protocol_handler>
+  bool boosted_tcp_server<t_protocol_handler>::is_stop_signal_sent()
+  {
+    return m_stop_signal_sent;
+  }
+  //---------------------------------------------------------------------------------
+  template<class t_protocol_handler>
   void boosted_tcp_server<t_protocol_handler>::handle_accept(const boost::system::error_code& e)
   {
     TRY_ENTRY();
@@ -607,7 +613,7 @@ PRAGMA_WARNING_DISABLE_VS(4355)
   }
   //---------------------------------------------------------------------------------
   template<class t_protocol_handler>
-  bool boosted_tcp_server<t_protocol_handler>::connect(const std::string& adr, const std::string& port, boost::uint32_t conn_timeot, t_connection_context& conn_context, const std::string& bind_ip)
+  bool boosted_tcp_server<t_protocol_handler>::connect(const std::string& adr, const std::string& port, boost::uint32_t conn_timeout, t_connection_context& conn_context, const std::string& bind_ip)
   {
     TRY_ENTRY();
 
@@ -662,12 +668,12 @@ PRAGMA_WARNING_DISABLE_VS(4355)
     sock_.async_connect(remote_endpoint, boost::bind<void>(connect_callback, _1, local_shared_context));
     while(local_shared_context->ec == boost::asio::error::would_block)
     {
-      bool r = local_shared_context->cond.timed_wait(lock, boost::get_system_time() + boost::posix_time::milliseconds(conn_timeot));
+      bool r = local_shared_context->cond.timed_wait(lock, boost::get_system_time() + boost::posix_time::milliseconds(conn_timeout));
       if(local_shared_context->ec == boost::asio::error::would_block && !r)
       {
         //timeout
         sock_.close();
-        LOG_PRINT_L3("Failed to connect to " << adr << ":" << port << ", because of timeout (" << conn_timeot << ")");
+        LOG_PRINT_L3("Failed to connect to " << adr << ":" << port << ", because of timeout (" << conn_timeout << ")");
         return false;
       }
     }

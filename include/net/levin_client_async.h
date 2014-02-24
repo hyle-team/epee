@@ -184,7 +184,6 @@ namespace levin
 		inline
 			bool recv_n(SOCKET s, std::string& buff)
 		{	
-			//тут размер буффера указывает на необходимый объём данных, которые нужно принять
 			size_t cb_remain = buff.size();
 			char*  m_current_ptr = (char*)buff.data();
 			return recv_n(s, m_current_ptr, cb_remain);

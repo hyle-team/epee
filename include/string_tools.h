@@ -39,6 +39,7 @@
 #include <boost/asio.hpp>
 #include <boost/algorithm/string/compare.hpp>
 #include <boost/algorithm/string.hpp>
+#include "warnings.h"
 
 
 #ifndef OUT
@@ -180,6 +181,8 @@ namespace string_tools
     }
   }
   //----------------------------------------------------------------------------
+PUSH_WARNINGS
+DISABLE_GCC_WARNING(maybe-uninitialized)
 	template<class XType>
 	inline bool get_xtype_from_string(OUT XType& val, const std::string& str_id)
 	{
@@ -201,6 +204,7 @@ namespace string_tools
 
 		return true;
 	}
+POP_WARNINGS
 	//---------------------------------------------------
 	template<typename int_t>
 	bool get_xnum_from_hex_string(const std::string str, int_t& res )

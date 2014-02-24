@@ -69,6 +69,14 @@ namespace misc_utils
 			return it;
 		}
 
+    template<typename t_iterator>
+    t_iterator move_it_backward(t_iterator it, size_t count)
+    {
+      while(count--)
+        it--;
+      return it;
+    }
+
 
 	// TEMPLATE STRUCT less
 	template<class _Ty>

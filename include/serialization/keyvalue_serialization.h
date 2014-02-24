@@ -63,67 +63,28 @@ public: \
   }\
   template<bool is_store, class this_type, class t_storage> \
   static bool serialize_map(this_type& this_ref,  t_storage& stg, typename t_storage::hsection hparent_section) \
-  { \
-  bool res = 0;
+  { 
 
 #define KV_SERIALIZE_N(varialble, val_name) \
-  res |= epee::serialization::selector<is_store>::serialize(this_ref.varialble, stg, hparent_section, val_name);
-
-  /*
-#define KV_SERIALIZE_VAL_N(varialble, val_name) \
-  if(is_store) \
-  res |= epee::serialization::serialize_t_val(this_ref.varialble, stg, hparent_section, val_name); \
-  else \
-  res |= epee::serialization::unserialize_t_val(this_ref.varialble, stg, hparent_section, val_name);
-  */
-/*
-#define KV_SERIALIZE_OBJ_N(varialble, val_name) \
-  if(is_store) \
-  res |= epee::serialization::serialize_t_obj(this_ref.varialble, stg, hparent_section, val_name); \
-  else \
-  res |= epee::serialization::unserialize_t_obj(this_ref.varialble, stg, hparent_section, val_name);
-  */
+  epee::serialization::selector<is_store>::serialize(this_ref.varialble, stg, hparent_section, val_name);
 
 #define KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE_N(varialble, val_name) \
-  res |= epee::serialization::selector<is_store>::serialize_t_val_as_blob(this_ref.varialble, stg, hparent_section, val_name); 
+  epee::serialization::selector<is_store>::serialize_t_val_as_blob(this_ref.varialble, stg, hparent_section, val_name); 
 
 #define KV_SERIALIZE_VAL_POD_AS_BLOB_N(varialble, val_name) \
   static_assert(std::is_pod<decltype(this_ref.varialble)>::value, "t_type must be a POD type."); \
   KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE_N(varialble, val_name)
 
-  /*
-#define KV_SERIALIZE_CONTAINER_VAL_N(varialble, val_name) \
-  if(is_store) \
-  res |= epee::serialization::serialize_stl_container_t_val(this_ref.varialble, stg, hparent_section, val_name); \
-  else \
-  res |= epee::serialization::unserialize_stl_container_t_val(this_ref.varialble, stg, hparent_section, val_name); \
-  */
-/*
-#define KV_SERIALIZE_CONTAINER_OBJ_N(varialble, val_name) \
-  if(is_store) \
-  res |= epee::serialization::serialize_stl_container_t_obj(this_ref.varialble, stg, hparent_section, val_name); \
-  else \
-  res |= epee::serialization::unserialize_stl_container_t_obj(this_ref.varialble, stg, hparent_section, val_name);
-  */
-  // serialize stl container like std::list<> and std::vector<> with POD types as one big blob
-
 #define KV_SERIALIZE_CONTAINER_POD_AS_BLOB_N(varialble, val_name) \
-  res |= epee::serialization::selector<is_store>::serialize_stl_container_pod_val_as_blob(this_ref.varialble, stg, hparent_section, val_name);
+  epee::serialization::selector<is_store>::serialize_stl_container_pod_val_as_blob(this_ref.varialble, stg, hparent_section, val_name);
 
-#define END_KV_SERIALIZE_MAP() return res;}
+#define END_KV_SERIALIZE_MAP() return true;}
 
-  //----------
 #define KV_SERIALIZE(varialble)                           KV_SERIALIZE_N(varialble, #varialble)
-//#define KV_SERIALIZE_VAL(varialble)                       KV_SERIALIZE_VAL_N(varialble, #varialble)
 #define KV_SERIALIZE_VAL_POD_AS_BLOB(varialble)           KV_SERIALIZE_VAL_POD_AS_BLOB_N(varialble, #varialble)
 #define KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(varialble)     KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE_N(varialble, #varialble) //skip is_pod compile time check
-//#define KV_SERIALIZE_OBJ(varialble)                       KV_SERIALIZE_OBJ_N(varialble, #varialble)
-//#define KV_SERIALIZE_CONTAINER_VAL(varialble)             KV_SERIALIZE_CONTAINER_VAL_N(varialble, #varialble)
-//#define KV_SERIALIZE_CONTAINER_OBJ(varialble)             KV_SERIALIZE_CONTAINER_OBJ_N(varialble, #varialble)
 #define KV_SERIALIZE_CONTAINER_POD_AS_BLOB(varialble)     KV_SERIALIZE_CONTAINER_POD_AS_BLOB_N(varialble, #varialble)
-  /************************************************************************/
-  /*  serialization -                                                    */
-  /************************************************************************/
+
 }
 
 

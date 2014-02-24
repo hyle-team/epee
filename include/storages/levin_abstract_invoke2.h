@@ -108,7 +108,7 @@ namespace epee
     }
 
     template<class t_result, class t_arg, class callback_t, class t_transport>
-    bool async_invoke_remote_command2(boost::uuids::uuid conn_id, int command, const t_arg& out_struct, t_transport& transport, callback_t cb)
+    bool async_invoke_remote_command2(boost::uuids::uuid conn_id, int command, const t_arg& out_struct, t_transport& transport, callback_t cb, size_t inv_timeout = LEVIN_DEFAULT_TIMEOUT_PRECONFIGURED)
     {
       typename serialization::portable_storage stg;
       const_cast<t_arg&>(out_struct).store(stg);//TODO: add true const support to searilzation
@@ -133,7 +133,7 @@ namespace epee
         result_struct.load(stg_ret);
         cb(code, result_struct, context);
         return true;
-      });
+      }, inv_timeout);
       if( res <=0 )
       {
         LOG_PRINT_L1("Failed to invoke command " << command << " return code " << res);

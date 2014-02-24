@@ -269,9 +269,9 @@ bool cp_server_impl<TProtocol>::worker_thread_member()
 				}
 				break;
 				/*else if(0 == res)
-				{//Похоже что операция закончилась сразу, незамедлительно
+				{
 					if(!bytes_recvd)
-					{//Но как-то неудачно
+					{
 						::InterlockedExchange(&pio_data->m_is_in_use, 0);
 						LOG_PRINT("WSARecv return 0, bytes_recvd=0, graceful close.", LOG_LEVEL_3);
 						int err = ::WSAGetLastError();
@@ -279,9 +279,8 @@ bool cp_server_impl<TProtocol>::worker_thread_member()
 						//pconnection->query_shutdown();
 						break;
 					}else
-					{//И вполне удачно
+					{
 						LOG_PRINT("WSARecv return immediatily 0, bytes_recvd=" << bytes_recvd, LOG_LEVEL_3);
-						//Тут ничего не трогаем, всёравно эта оперия придёт на порт завершения
 						//pconnection->m_tprotocol_handler.handle_recv(pio_data->Buffer, bytes_recvd);
 					}
 				}*/
@@ -356,8 +355,6 @@ bool cp_server_impl<TProtocol>::shutdown_connection(connection<TProtocol>* pconn
 template<class TProtocol> 
 bool cp_server_impl<TProtocol>::run_server(int threads_count = 0)
 {
-
-	//Ставим в состояние прослушки
 	int err = listen(m_listen_socket, 100);
 	if(SOCKET_ERROR == err )
 	{
@@ -370,9 +367,8 @@ bool cp_server_impl<TProtocol>::run_server(int threads_count = 0)
 	{
 		SYSTEM_INFO si = {0};
 		::GetSystemInfo(&si);
-		threads_count = si.dwNumberOfProcessors + 2;//Два запасных, на случай блокировки
+		threads_count = si.dwNumberOfProcessors + 2;
 	}
-	//Создадим заданное кол-во потоков
 	for(int i = 0; i != threads_count; i++)
 	{
 		boost::thread(boost::bind(&cp_server_impl::worker_thread_member, this));
@@ -437,7 +433,6 @@ bool cp_server_impl<TProtocol>::run_server(int threads_count = 0)
 		}
 
 	}
-	//Нужно остановить ждущие потоки, и позакрывать все висящие соединения
 	LOG_PRINT("Closing connections("<< m_connections.size() << ") and waiting...", LOG_LEVEL_2);
 	m_connections_lock.lock();
 	for(connections_container::iterator it = m_connections.begin(); it != m_connections.end(); it++)
@@ -492,7 +487,6 @@ bool cp_server_impl<TProtocol>::add_new_connection(SOCKET new_sock, long ip_from
 	conn.context.m_remote_ip = ip_from;
 	conn.context.m_remote_port = port_from;
 	conn.m_completion_port = m_completion_port;
-	//Ассоциируем сокет с портом завершения
 	{
 		PROFILE_FUNC("[add_new_connection] CreateIoCompletionPort");
 		::CreateIoCompletionPort((HANDLE)new_sock, m_completion_port, (ULONG_PTR)&conn, 0);
@@ -518,7 +512,6 @@ bool cp_server_impl<TProtocol>::add_new_connection(SOCKET new_sock, long ip_from
 			conn.m_precv_data->DataBuf.buf = conn.m_precv_data->Buffer;
 			conn.m_precv_data->m_op_type = op_type_recv;
 			InterlockedExchange(&conn.m_precv_data->m_is_in_use, 1);
-			//Выполняем вызов WSARecv() и переходим опять к ожиданию завершения 
 			DWORD bytes_recvd = 0;
 			DWORD flags = 0;
 
@@ -531,7 +524,7 @@ bool cp_server_impl<TProtocol>::add_new_connection(SOCKET new_sock, long ip_from
 			{
 				int err = ::WSAGetLastError();
 				if(WSA_IO_PENDING == err )
-				{//Ушли в пендинг, отлично, снимаемся
+				{
 					break;
 				}
 				LOG_ERROR("BIG FAIL: WSARecv error code not correct, res=" << res << " last_err=" << err << " " << log_space::get_win32_err_descr(err));
@@ -544,19 +537,17 @@ bool cp_server_impl<TProtocol>::add_new_connection(SOCKET new_sock, long ip_from
 
 			break;
 			/*else if(0 == res)
-			{//Похоже что операция закончилась сразу, незамедлительно
+			{
 				if(!bytes_recvd)
-				{//Соединение закрыто удалённым хостом
+				{
 					PROFILE_FUNC("[add_new_connection] shutdown_connection");
 					::InterlockedExchange(&conn.m_precv_data->m_is_in_use, 0);
 					conn.query_shutdown();
 					//shutdown_connection(&conn);
 					break;
 				}else
-				{//И вполне удачно
+				{
 					PROFILE_FUNC("[add_new_connection] handle_recv");
-					//Тут ничего не трогаем т.к. этот результат всёравно придёт на порт завершения
-
 				}
 			}*/
 		}
