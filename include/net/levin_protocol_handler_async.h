@@ -64,8 +64,8 @@ class async_protocol_handler_config
 public:
   typedef t_connection_context connection_context;
   levin_commands_handler<t_connection_context>* m_pcommands_handler;
-  boost::uint64_t m_max_packet_size; 
-  boost::uint64_t m_invoke_timeout;
+  uint64_t m_max_packet_size; 
+  uint64_t m_invoke_timeout;
 
   int invoke(int command, const std::string& in_buff, std::string& buff_out, boost::uuids::uuid connection_id);
   template<class callback_t>
@@ -122,7 +122,7 @@ public:
   std::string m_cache_in_buffer;
   stream_state m_state;
 
-  boost::int32_t m_oponent_protocol_ver;
+  int32_t m_oponent_protocol_ver;
   bool m_connection_initialized;
 
   struct invoke_response_handler_base
@@ -293,6 +293,9 @@ public:
 
   void request_callback()
   {
+    misc_utils::auto_scope_leave_caller scope_exit_handler = misc_utils::create_scope_leave_handler(
+      boost::bind(&async_protocol_handler::finish_outer_call, this));
+
     m_pservice_endpoint->request_callback();
   }
 
@@ -421,7 +424,7 @@ public:
         {
           if(m_cache_in_buffer.size() < sizeof(bucket_head2))
           {
-            if(m_cache_in_buffer.size() >= sizeof(boost::uint64_t) && *((boost::uint64_t*)m_cache_in_buffer.data()) != LEVIN_SIGNATURE)
+            if(m_cache_in_buffer.size() >= sizeof(uint64_t) && *((uint64_t*)m_cache_in_buffer.data()) != LEVIN_SIGNATURE)
             {
               LOG_ERROR_CC(m_connection_context, "Signature mismatch, connection will be closed");
               return false;
@@ -759,12 +762,17 @@ bool async_protocol_handler_config<t_connection_context>::update_connection_cont
 template<class t_connection_context>
 bool async_protocol_handler_config<t_connection_context>::request_callback(boost::uuids::uuid connection_id)
 {
-  CRITICAL_REGION_LOCAL(m_connects_lock);
-  async_protocol_handler<t_connection_context>* aph = find_connection(connection_id);
-  if(0 == aph)
+  async_protocol_handler<t_connection_context>* aph;
+  int r = find_and_lock_connection(connection_id, aph);
+  if(LEVIN_OK == r)
+  {
+    aph->request_callback();
+    return true;
+  }
+  else
+  {
     return false;
-  aph->request_callback();
-  return true;
+  }
 }
 }
 }

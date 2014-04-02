@@ -57,7 +57,7 @@ namespace net_utils
 
   struct i_connection_filter
   {
-    virtual bool is_remote_ip_allowed(boost::uint32_t adress)=0;
+    virtual bool is_remote_ip_allowed(uint32_t adress)=0;
   protected:
     virtual ~i_connection_filter(){}
   };
@@ -76,7 +76,7 @@ namespace net_utils
     typedef typename t_protocol_handler::connection_context t_connection_context;
     /// Construct a connection with the given io_service.
     explicit connection(boost::asio::io_service& io_service,
-      typename t_protocol_handler::config_type& config, volatile boost::uint32_t& sock_count, i_connection_filter * &pfilter);
+      typename t_protocol_handler::config_type& config, volatile uint32_t& sock_count, i_connection_filter * &pfilter);
 
     virtual ~connection();
     /// Get the socket associated with the connection.
@@ -98,6 +98,7 @@ namespace net_utils
     virtual bool add_ref();
     virtual bool release();
     //------------------------------------------------------
+    boost::shared_ptr<connection<t_protocol_handler> > safe_shared_from_this();
     bool shutdown();
     /// Handle completion of a read operation.
     void handle_read(const boost::system::error_code& e,
@@ -116,11 +117,11 @@ namespace net_utils
     boost::array<char, 8192> buffer_;
 
     t_connection_context context;
-    volatile boost::uint32_t m_want_close_connection;
+    volatile uint32_t m_want_close_connection;
     std::atomic<bool> m_was_shutdown;
     critical_section m_send_que_lock;
     std::list<std::string> m_send_que;
-    volatile boost::uint32_t& m_ref_sockets_count;
+    volatile uint32_t& m_ref_sockets_count;
     i_connection_filter* &m_pfilter;
     volatile bool m_is_multithreaded;
 
@@ -145,7 +146,7 @@ namespace net_utils
     /// Construct the server to listen on the specified TCP address and port, and
     /// serve up files from the given directory.
     boosted_tcp_server();
-    explicit boosted_tcp_server(boost::asio::io_service& extarnal_io_service);
+    explicit boosted_tcp_server(boost::asio::io_service& external_io_service);
     ~boosted_tcp_server();
 
     bool init_server(uint32_t port, const std::string address = "0.0.0.0");
@@ -155,7 +156,7 @@ namespace net_utils
     bool run_server(size_t threads_count, bool wait = true);
 
     /// wait for service workers stop
-    bool timed_wait_server_stop(boost::uint64_t wait_mseconds);
+    bool timed_wait_server_stop(uint64_t wait_mseconds);
 
     /// Stop the server.
     void send_stop_signal();
@@ -170,9 +171,9 @@ namespace net_utils
 
     void set_connection_filter(i_connection_filter* pfilter);
 
-    bool connect(const std::string& adr, const std::string& port, boost::uint32_t conn_timeot, t_connection_context& cn, const std::string& bind_ip = "0.0.0.0");
+    bool connect(const std::string& adr, const std::string& port, uint32_t conn_timeot, t_connection_context& cn, const std::string& bind_ip = "0.0.0.0");
     template<class t_callback>
-    bool connect_async(const std::string& adr, const std::string& port, boost::uint32_t conn_timeot, t_callback cb, const std::string& bind_ip = "0.0.0.0");
+    bool connect_async(const std::string& adr, const std::string& port, uint32_t conn_timeot, t_callback cb, const std::string& bind_ip = "0.0.0.0");
 
     typename t_protocol_handler::config_type& get_config_object(){return m_config;}
 
@@ -190,13 +191,13 @@ namespace net_utils
                                                           m_timer(io_serice)
       {}
       boost::asio::deadline_timer m_timer;
-      boost::uint64_t m_period;
+      uint64_t m_period;
     };
 
     template <class t_handler>
     struct idle_callback_conext: public idle_callback_conext_base
     {
-      idle_callback_conext(boost::asio::io_service& io_serice, t_handler& h, boost::uint64_t period):
+      idle_callback_conext(boost::asio::io_service& io_serice, t_handler& h, uint64_t period):
                                                     idle_callback_conext_base(io_serice),
                                                     m_handler(h)
       {this->m_period = period;}
@@ -209,7 +210,7 @@ namespace net_utils
     };
 
     template<class t_handler>
-    bool add_idle_handler(t_handler t_callback, boost::uint64_t timeout_ms)
+    bool add_idle_handler(t_handler t_callback, uint64_t timeout_ms)
       {
         boost::shared_ptr<idle_callback_conext_base> ptr(new idle_callback_conext<t_handler>(io_service_, t_callback, timeout_ms));
         //needed call handler here ?...
@@ -257,7 +258,7 @@ namespace net_utils
     connection_ptr new_connection_;
     std::atomic<bool> m_stop_signal_sent;
     uint32_t m_port;
-    volatile boost::uint32_t m_sockets_count;
+    volatile uint32_t m_sockets_count;
     std::string m_address;
     std::string m_thread_name_prefix;
     size_t m_threads_count;

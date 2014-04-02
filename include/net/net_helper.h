@@ -387,20 +387,20 @@ namespace net_utils
 
 				if (ec)
 				{
-          LOG_PRINT_L4("READ ENDS: Connection err_code " << ec.value());
-          if(ec == boost::asio::error::eof)
-          {
-            LOG_PRINT_L4("Connection err_code eof.");
-            //connection closed there, empty
-            return true;
-          }
+                    LOG_PRINT_L4("READ ENDS: Connection err_code " << ec.value());
+                    if(ec == boost::asio::error::eof)
+                    {
+                      LOG_PRINT_L4("Connection err_code eof.");
+                      //connection closed there, empty
+                      return true;
+                    }
 
 					LOG_PRINT_L3("Problems at read: " << ec.message());
-          m_connected = false;
+                    m_connected = false;
 					return false;
 				}else
 				{
-          LOG_PRINT_L4("READ ENDS: Success. bytes_tr: " << bytes_transfered);
+                    LOG_PRINT_L4("READ ENDS: Success. bytes_tr: " << bytes_transfered);
 					m_deadline.expires_at(boost::posix_time::pos_infin);
 				}
 
@@ -429,7 +429,7 @@ namespace net_utils
 
 		}
 
-		inline bool recv_n(std::string& buff, boost::int64_t sz)
+		inline bool recv_n(std::string& buff, int64_t sz)
 		{
 
 			try
@@ -564,7 +564,7 @@ namespace net_utils
 		bool m_initialized;
 		bool m_connected;
 		boost::asio::deadline_timer m_deadline;
-		volatile boost::uint32_t m_shutdowned;
+		volatile uint32_t m_shutdowned;
 	};
 
 

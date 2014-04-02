@@ -30,6 +30,7 @@
 #define _NET_UTILS_BASE_H_
 
 #include <boost/uuid/uuid.hpp>
+#include "string_tools.h"
 
 #ifndef MAKE_IP
 #define MAKE_IP( a1, a2, a3, a4 )	(a1|(a2<<8)|(a3<<16)|(a4<<24))
@@ -46,23 +47,36 @@ namespace net_utils
 	struct connection_context_base
 	{
     const boost::uuids::uuid m_connection_id;
-		const boost::uint32_t m_remote_ip;
-		const boost::uint32_t m_remote_port;
-    const bool m_is_income;
+		const uint32_t m_remote_ip;
+		const uint32_t m_remote_port;
+    const bool     m_is_income;
+    const time_t   m_started;
+    time_t   m_last_recv;
+    time_t   m_last_send;
+    uint64_t m_recv_cnt;
+    uint64_t m_send_cnt;
 
-    connection_context_base(boost::uuids::uuid connection_id, long remote_ip, int remote_port, bool is_income):
+    connection_context_base(boost::uuids::uuid connection_id, long remote_ip, int remote_port, bool is_income, time_t last_recv = 0, time_t last_send = 0, uint64_t recv_cnt = 0, uint64_t send_cnt = 0):
                                             m_connection_id(connection_id),
                                             m_remote_ip(remote_ip),
                                             m_remote_port(remote_port),
-                                            m_is_income(is_income)
-
-
+                                            m_is_income(is_income),
+                                            m_last_recv(last_recv),
+                                            m_last_send(last_send),
+                                            m_recv_cnt(recv_cnt),
+                                            m_send_cnt(send_cnt),
+                                            m_started(time(NULL))
     {}
 
     connection_context_base(): m_connection_id(),
                                m_remote_ip(0),
                                m_remote_port(0),
-                               m_is_income(false)
+                               m_is_income(false),
+                               m_last_recv(0),
+                               m_last_send(0),
+                               m_recv_cnt(0),
+                               m_send_cnt(0),
+                               m_started(time(NULL))
     {}
 
     connection_context_base& operator=(const connection_context_base& a)
@@ -107,7 +121,7 @@ namespace net_utils
     std::string print_connection_context(const connection_context_base& ctx)
   {
     std::stringstream ss;
-    ss << string_tools::get_ip_string_from_int32(ctx.m_remote_ip) << ":" << ctx.m_remote_port << " " << string_tools::get_str_from_guid_a(ctx.m_connection_id) << (ctx.m_is_income ? " INC":" OUT");
+    ss << epee::string_tools::get_ip_string_from_int32(ctx.m_remote_ip) << ":" << ctx.m_remote_port << " " << epee::string_tools::get_str_from_guid_a(ctx.m_connection_id) << (ctx.m_is_income ? " INC":" OUT");
     return ss.str();
   }
 
@@ -115,7 +129,7 @@ namespace net_utils
     std::string print_connection_context_short(const connection_context_base& ctx)
   {
     std::stringstream ss;
-    ss << string_tools::get_ip_string_from_int32(ctx.m_remote_ip) << ":" << ctx.m_remote_port << (ctx.m_is_income ? " INC":" OUT");
+    ss << epee::string_tools::get_ip_string_from_int32(ctx.m_remote_ip) << ":" << ctx.m_remote_port << (ctx.m_is_income ? " INC":" OUT");
     return ss.str();
   }
 
@@ -123,6 +137,9 @@ namespace net_utils
 #define LOG_PRINT_CC_GREEN(ct, message, log_level) LOG_PRINT_GREEN("[" << epee::net_utils::print_connection_context_short(ct) << "]" << message, log_level)
 #define LOG_PRINT_CC_RED(ct, message, log_level) LOG_PRINT_RED("[" << epee::net_utils::print_connection_context_short(ct) << "]" << message, log_level)
 #define LOG_PRINT_CC_BLUE(ct, message, log_level) LOG_PRINT_BLUE("[" << epee::net_utils::print_connection_context_short(ct) << "]" << message, log_level)
+#define LOG_PRINT_CC_YELLOW(ct, message, log_level) LOG_PRINT_YELLOW("[" << epee::net_utils::print_connection_context_short(ct) << "]" << message, log_level)
+#define LOG_PRINT_CC_CYAN(ct, message, log_level) LOG_PRINT_CYAN("[" << epee::net_utils::print_connection_context_short(ct) << "]" << message, log_level)
+#define LOG_PRINT_CC_MAGENTA(ct, message, log_level) LOG_PRINT_MAGENTA("[" << epee::net_utils::print_connection_context_short(ct) << "]" << message, log_level)
 #define LOG_ERROR_CC(ct, message) LOG_ERROR("[" << epee::net_utils::print_connection_context_short(ct) << "]" << message)
 
 #define LOG_PRINT_CC_L0(ct, message) LOG_PRINT_L0("[" << epee::net_utils::print_connection_context_short(ct) << "]" << message)
@@ -140,6 +157,9 @@ namespace net_utils
 #define LOG_PRINT_CCONTEXT_GREEN(message, log_level) LOG_PRINT_CC_GREEN(context, message, log_level)
 #define LOG_PRINT_CCONTEXT_RED(message, log_level) LOG_PRINT_CC_RED(context, message, log_level)
 #define LOG_PRINT_CCONTEXT_BLUE(message, log_level) LOG_PRINT_CC_BLUE(context, message, log_level) 
+#define LOG_PRINT_CCONTEXT_YELLOW(message, log_level) LOG_PRINT_CC_YELLOW(context, message, log_level) 
+#define LOG_PRINT_CCONTEXT_CYAN(message, log_level) LOG_PRINT_CC_CYAN(context, message, log_level) 
+#define LOG_PRINT_CCONTEXT_MAGENTA(message, log_level) LOG_PRINT_CC_MAGENTA(context, message, log_level) 
 
 #define CHECK_AND_ASSERT_MES_CC(condition, return_val, err_message) CHECK_AND_ASSERT_MES(condition, return_val, "[" << epee::net_utils::print_connection_context_short(context) << "]" << err_message)
 

@@ -391,10 +391,10 @@ using namespace std;
 					return true;
 				}
 				else
-        {
-          LOG_PRINT_L3("Returning false because of wrong state machine. state: " << m_state);
-          return false;
-        }
+                {
+                  LOG_PRINT_L3("Returning false because of wrong state machine. state: " << m_state);
+                  return false;
+                }
 			}
 			//---------------------------------------------------------------------------
 			inline
@@ -801,7 +801,7 @@ using namespace std;
 				}else
 				{   //Apparently there are no signs of the form of transfer, will receive data until the connection is closed
 					m_state = reciev_machine_state_error;
-					LOG_PRINT("Undefinded transfer type, consider http_body_transfer_connection_close method.", LOG_LEVEL_2);
+					LOG_PRINT("Undefinded transfer type, consider http_body_transfer_connection_close method. header: " << m_header_cache, LOG_LEVEL_2);
 					return false;
 				} 
 				return false;

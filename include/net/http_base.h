@@ -127,7 +127,7 @@ namespace net_utils
       std::string schema;
       std::string host;
       std::string uri;
-      boost::uint64_t port;
+      uint64_t port;
       uri_content m_uri_content;
     };
 
@@ -145,10 +145,10 @@ namespace net_utils
 			std::string       m_http_method_str;
 			std::string       m_full_request_str;
 			std::string       m_replace_html;
-      std::string       m_request_head;
-			bool				      m_have_to_block;
+            std::string       m_request_head;
 			int               m_http_ver_hi;
 			int               m_http_ver_lo;
+            bool		      m_have_to_block;
 			http_header_info	m_header_info;
       uri_content       m_uri_content;
 			size_t				    m_full_request_buf_size;

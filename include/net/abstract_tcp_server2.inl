@@ -49,10 +49,9 @@ PRAGMA_WARNING_DISABLE_VS(4355)
 
   template<class t_protocol_handler>
   connection<t_protocol_handler>::connection(boost::asio::io_service& io_service,
-    typename t_protocol_handler::config_type& config, volatile boost::uint32_t& sock_count, i_connection_filter* &pfilter)
+    typename t_protocol_handler::config_type& config, volatile uint32_t& sock_count, i_connection_filter* &pfilter)
                           : strand_(io_service),
                             socket_(io_service),
-                            //context(typename boost::value_initialized<t_connection_context>())
                             m_protocol_handler(this, config, context), 
                             m_want_close_connection(0), 
                             m_was_shutdown(0), 
@@ -83,9 +82,28 @@ PRAGMA_WARNING_DISABLE_VS(4355)
   }
   //---------------------------------------------------------------------------------
   template<class t_protocol_handler>
+  boost::shared_ptr<connection<t_protocol_handler> > connection<t_protocol_handler>::safe_shared_from_this()
+  {
+    try
+    {
+      return connection<t_protocol_handler>::shared_from_this();
+    }
+    catch (const boost::bad_weak_ptr&)
+    {
+      // It happens when the connection is being deleted
+      return boost::shared_ptr<connection<t_protocol_handler> >();
+    }
+  }
+  //---------------------------------------------------------------------------------
+  template<class t_protocol_handler>
   bool connection<t_protocol_handler>::start(bool is_income, bool is_multithreaded)
   {
     TRY_ENTRY();
+
+    // Use safe_shared_from_this, because of this is public method and it can be called on the object being deleted
+    auto self = safe_shared_from_this();
+    if(!self)
+      return false;
 
     m_is_multithreaded = is_multithreaded;
 
@@ -115,7 +133,7 @@ PRAGMA_WARNING_DISABLE_VS(4355)
 
     socket_.async_read_some(boost::asio::buffer(buffer_),
       strand_.wrap(
-        boost::bind(&connection<t_protocol_handler>::handle_read, connection<t_protocol_handler>::shared_from_this(),
+        boost::bind(&connection<t_protocol_handler>::handle_read, self,
           boost::asio::placeholders::error,
           boost::asio::placeholders::bytes_transferred)));
 
@@ -129,12 +147,15 @@ PRAGMA_WARNING_DISABLE_VS(4355)
   {
     TRY_ENTRY();
     LOG_PRINT_L2("[" << print_connection_context_short(context) << "] request_callback");
-    strand_.post(boost::bind(
-      &connection<t_protocol_handler>::call_back_starter, connection<t_protocol_handler>::shared_from_this()));
+    // Use safe_shared_from_this, because of this is public method and it can be called on the object being deleted
+    auto self = safe_shared_from_this();
+    if(!self)
+      return false;
 
+    strand_.post(boost::bind(&connection<t_protocol_handler>::call_back_starter, self));
     CATCH_ENTRY_L0("connection<t_protocol_handler>::request_callback()", false);
     return true;
-  } 
+  }
   //---------------------------------------------------------------------------------
   template<class t_protocol_handler>
   boost::asio::io_service& connection<t_protocol_handler>::get_io_service()
@@ -148,9 +169,14 @@ PRAGMA_WARNING_DISABLE_VS(4355)
     TRY_ENTRY();
     LOG_PRINT_L4("[sock " << socket_.native_handle() << "] add_ref");
     CRITICAL_REGION_LOCAL(m_self_refs_lock);
+
+    // Use safe_shared_from_this, because of this is public method and it can be called on the object being deleted
+    auto self = safe_shared_from_this();
+    if(!self)
+      return false;
     if(m_was_shutdown)
       return false;
-    m_self_refs.push_back(connection<t_protocol_handler>::shared_from_this());    
+    m_self_refs.push_back(self);
     return true;
     CATCH_ENTRY_L0("connection<t_protocol_handler>::add_ref()", false);
   }
@@ -189,10 +215,9 @@ PRAGMA_WARNING_DISABLE_VS(4355)
 
     if (!e)
     {
-      /**/
-
-      auto self_sh_ptr =  connection<t_protocol_handler>::shared_from_this();
       LOG_PRINT("[sock " << socket_.native_handle() << "] RECV " << bytes_transferred, LOG_LEVEL_4);
+      context.m_last_recv = time(NULL);
+      context.m_recv_cnt += bytes_transferred;
       bool recv_res = m_protocol_handler.handle_recv(buffer_.data(), bytes_transferred);
       if(!recv_res)
       {  
@@ -262,10 +287,16 @@ PRAGMA_WARNING_DISABLE_VS(4355)
   bool connection<t_protocol_handler>::do_send(const void* ptr, size_t cb)
   {
     TRY_ENTRY();
+    // Use safe_shared_from_this, because of this is public method and it can be called on the object being deleted
+    auto self = safe_shared_from_this();
+    if(!self)
+      return false;
     if(m_was_shutdown)
       return false;
 
     LOG_PRINT("[sock " << socket_.native_handle() << "] SEND " << cb, LOG_LEVEL_4);
+    context.m_last_send = time(NULL);
+    context.m_send_cnt += cb;
     //some data should be wrote to stream
     //request complete
     
@@ -295,7 +326,7 @@ PRAGMA_WARNING_DISABLE_VS(4355)
 
       boost::asio::async_write(socket_, boost::asio::buffer(m_send_que.front().data(), m_send_que.front().size()),
         //strand_.wrap(
-        boost::bind(&connection<t_protocol_handler>::handle_write, connection<t_protocol_handler>::shared_from_this(), _1, _2)
+        boost::bind(&connection<t_protocol_handler>::handle_write, self, _1, _2)
         //)
         );
 
@@ -445,8 +476,8 @@ DISABLE_GCC_WARNING(maybe-uninitialized)
     uint32_t p = 0;
 
     if (port.size() && !string_tools::get_xtype_from_string(p, port)) {
+      LOG_ERROR("Failed to convert port no = " << port);
       return false;
-      LOG_ERROR("Failed to convert port no = port");
     }
     return this->init_server(p, address);
   }
@@ -558,7 +589,7 @@ POP_WARNINGS
   }
   //---------------------------------------------------------------------------------
   template<class t_protocol_handler>
-  bool boosted_tcp_server<t_protocol_handler>::timed_wait_server_stop(boost::uint64_t wait_mseconds)
+  bool boosted_tcp_server<t_protocol_handler>::timed_wait_server_stop(uint64_t wait_mseconds)
   {
     TRY_ENTRY();
     boost::chrono::milliseconds ms(wait_mseconds);
@@ -613,7 +644,7 @@ POP_WARNINGS
   }
   //---------------------------------------------------------------------------------
   template<class t_protocol_handler>
-  bool boosted_tcp_server<t_protocol_handler>::connect(const std::string& adr, const std::string& port, boost::uint32_t conn_timeout, t_connection_context& conn_context, const std::string& bind_ip)
+  bool boosted_tcp_server<t_protocol_handler>::connect(const std::string& adr, const std::string& port, uint32_t conn_timeout, t_connection_context& conn_context, const std::string& bind_ip)
   {
     TRY_ENTRY();
 
@@ -704,7 +735,7 @@ POP_WARNINGS
   }
   //---------------------------------------------------------------------------------
   template<class t_protocol_handler> template<class t_callback>
-  bool boosted_tcp_server<t_protocol_handler>::connect_async(const std::string& adr, const std::string& port, boost::uint32_t conn_timeout, t_callback cb, const std::string& bind_ip)
+  bool boosted_tcp_server<t_protocol_handler>::connect_async(const std::string& adr, const std::string& port, uint32_t conn_timeout, t_callback cb, const std::string& bind_ip)
   {
     TRY_ENTRY();    
     connection_ptr new_connection_l(new connection<t_protocol_handler>(io_service_, m_config, m_sockets_count, m_pfilter) );
