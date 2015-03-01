@@ -47,6 +47,7 @@
 #define BEGIN_URI_MAP2()   template<class t_context> bool handle_http_request_map(const epee::net_utils::http::http_request_info& query_info, \
   epee::net_utils::http::http_response_info& response_info, \
   t_context& m_conn_context) { \
+  LOG_PRINT_L1("[HTTP][" << query_info.m_URI << "]"); \
   bool handled = false; \
   if(false) return true; //just a stub to have "else if"
 
@@ -120,7 +121,7 @@ namespace epee
     {
       std::string jsonrpc;
       std::string method;
-      std::string id;
+      epee::serialization::storage_entry id;
       t_param     params;
 
       BEGIN_KV_SERIALIZE_MAP()
@@ -158,7 +159,7 @@ namespace epee
     {
       std::string jsonrpc;
       t_param     result;
-      std::string id;
+      epee::serialization::storage_entry id;
       t_error     error;
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(jsonrpc)
@@ -173,7 +174,7 @@ namespace epee
     {
       std::string jsonrpc;
       t_param     result;
-      std::string id;
+      epee::serialization::storage_entry id;
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(jsonrpc)
         KV_SERIALIZE(id)
@@ -186,7 +187,7 @@ namespace epee
     {
       std::string jsonrpc;
       t_error     error;
-      std::string id;
+      epee::serialization::storage_entry id;
       BEGIN_KV_SERIALIZE_MAP()
         KV_SERIALIZE(jsonrpc)
         KV_SERIALIZE(id)
@@ -213,6 +214,9 @@ namespace epee
        epee::serialization::store_t_to_json(static_cast<epee::json_rpc::error_response&>(rsp), response_info.m_body); \
        return true; \
     } \
+    epee::serialization::storage_entry id_; \
+    id_ = epee::serialization::storage_entry(std::string()); \
+    ps.get_value("id", id_, nullptr); \
     std::string callback_name; \
     if(!ps.get_value("method", callback_name, nullptr)) \
     { \
@@ -223,20 +227,42 @@ namespace epee
       epee::serialization::store_t_to_json(static_cast<epee::json_rpc::error_response&>(rsp), response_info.m_body); \
       return true; \
     } \
+    LOG_PRINT_L1("json_rpc: ") \
     if(false) return true; //just a stub to have "else if"
 
-#define MAP_JON_RPC_WE(method_name, callback_f, command_type) \
-    else if(callback_name == method_name) \
-{ \
+
+#define PREPARE_OBJECTS_FROM_JSON(command_type) \
   handled = true; \
   boost::value_initialized<epee::json_rpc::request<command_type::request> > req_; \
   epee::json_rpc::request<command_type::request>& req = static_cast<epee::json_rpc::request<command_type::request>&>(req_);\
-  req.load(ps); \
+  if(!req.load(ps)) \
+  { \
+    epee::json_rpc::error_response fail_resp = AUTO_VAL_INIT(fail_resp); \
+    fail_resp.jsonrpc = "2.0"; \
+    fail_resp.id = req.id; \
+    fail_resp.error.code = -32602; \
+    fail_resp.error.message = "Invalid params"; \
+    epee::serialization::store_t_to_json(static_cast<epee::json_rpc::error_response&>(fail_resp), response_info.m_body); \
+    return true; \
+  } \
   uint64_t ticks1 = epee::misc_utils::get_tick_count(); \
   boost::value_initialized<epee::json_rpc::response<command_type::response, epee::json_rpc::dummy_error> > resp_; \
   epee::json_rpc::response<command_type::response, epee::json_rpc::dummy_error>& resp =  static_cast<epee::json_rpc::response<command_type::response, epee::json_rpc::dummy_error> &>(resp_); \
   resp.jsonrpc = "2.0"; \
-  resp.id = req.id; \
+  resp.id = req.id;
+
+#define FINALIZE_OBJECTS_TO_JSON(method_name) \
+  uint64_t ticks2 = epee::misc_utils::get_tick_count(); \
+  epee::serialization::store_t_to_json(resp, response_info.m_body); \
+  uint64_t ticks3 = epee::misc_utils::get_tick_count(); \
+  response_info.m_mime_tipe = "application/json"; \
+  response_info.m_header_info.m_content_type = " application/json"; \
+  LOG_PRINT( query_info.m_URI << "[" << method_name << "] processed with " << ticks1-ticks << "/"<< ticks2-ticks1 << "/" << ticks3-ticks2 << "ms", LOG_LEVEL_2);
+
+#define MAP_JON_RPC_WE(method_name, callback_f, command_type) \
+    else if(callback_name == method_name) \
+{ \
+  PREPARE_OBJECTS_FROM_JSON(command_type) \
   epee::json_rpc::error_response fail_resp = AUTO_VAL_INIT(fail_resp); \
   fail_resp.jsonrpc = "2.0"; \
   fail_resp.id = req.id; \
@@ -245,27 +271,14 @@ namespace epee
     epee::serialization::store_t_to_json(static_cast<epee::json_rpc::error_response&>(fail_resp), response_info.m_body); \
     return true; \
   } \
-  uint64_t ticks2 = epee::misc_utils::get_tick_count(); \
-  epee::serialization::store_t_to_json(resp, response_info.m_body); \
-  uint64_t ticks3 = epee::misc_utils::get_tick_count(); \
-  response_info.m_mime_tipe = "application/json"; \
-  response_info.m_header_info.m_content_type = " application/json"; \
-  LOG_PRINT( query_info.m_URI << "[" << method_name << "] processed with " << ticks1-ticks << "/"<< ticks2-ticks1 << "/" << ticks3-ticks2 << "ms", LOG_LEVEL_2); \
+  FINALIZE_OBJECTS_TO_JSON(method_name) \
   return true;\
 }
 
 #define MAP_JON_RPC_WERI(method_name, callback_f, command_type) \
     else if(callback_name == method_name) \
 { \
-  handled = true; \
-  boost::value_initialized<epee::json_rpc::request<command_type::request> > req_; \
-  epee::json_rpc::request<command_type::request>& req = static_cast<epee::json_rpc::request<command_type::request>&>(req_);\
-  req.load(ps); \
-  uint64_t ticks1 = epee::misc_utils::get_tick_count(); \
-  boost::value_initialized<epee::json_rpc::response<command_type::response, epee::json_rpc::dummy_error> > resp_; \
-  epee::json_rpc::response<command_type::response, epee::json_rpc::dummy_error>& resp =  static_cast<epee::json_rpc::response<command_type::response, epee::json_rpc::dummy_error> &>(resp_); \
-  resp.jsonrpc = "2.0"; \
-  resp.id = req.id; \
+  PREPARE_OBJECTS_FROM_JSON(command_type) \
   epee::json_rpc::error_response fail_resp = AUTO_VAL_INIT(fail_resp); \
   fail_resp.jsonrpc = "2.0"; \
   fail_resp.id = req.id; \
@@ -274,28 +287,14 @@ namespace epee
     epee::serialization::store_t_to_json(static_cast<epee::json_rpc::error_response&>(fail_resp), response_info.m_body); \
     return true; \
   } \
-  uint64_t ticks2 = epee::misc_utils::get_tick_count(); \
-  epee::serialization::store_t_to_json(resp, response_info.m_body); \
-  uint64_t ticks3 = epee::misc_utils::get_tick_count(); \
-  response_info.m_mime_tipe = "application/json"; \
-  response_info.m_header_info.m_content_type = " application/json"; \
-  LOG_PRINT( query_info.m_URI << "[" << method_name << "] processed with " << ticks1-ticks << "/"<< ticks2-ticks1 << "/" << ticks3-ticks2 << "ms", LOG_LEVEL_2); \
+  FINALIZE_OBJECTS_TO_JSON(method_name) \
   return true;\
 }
-
 
 #define MAP_JON_RPC(method_name, callback_f, command_type) \
     else if(callback_name == method_name) \
 { \
-  handled = true; \
-  boost::value_initialized<epee::json_rpc::request<command_type::request> > req_; \
-  epee::json_rpc::request<command_type::request>& req = static_cast<epee::json_rpc::request<command_type::request>&>(req_);\
-  req.load(ps); \
-  uint64_t ticks1 = epee::misc_utils::get_tick_count(); \
-  boost::value_initialized<epee::json_rpc::response<command_type::response, epee::json_rpc::dummy_error> > resp_; \
-  epee::json_rpc::response<command_type::response, epee::json_rpc::dummy_error>& resp =  static_cast<epee::json_rpc::response<command_type::response, epee::json_rpc::dummy_error> &>(resp_); \
-  resp.jsonrpc = "2.0"; \
-  resp.id = req.id; \
+  PREPARE_OBJECTS_FROM_JSON(command_type) \
   if(!callback_f(req.params, resp.result, m_conn_context)) \
   { \
     epee::json_rpc::error_response fail_resp = AUTO_VAL_INIT(fail_resp); \
@@ -306,18 +305,15 @@ namespace epee
     epee::serialization::store_t_to_json(static_cast<epee::json_rpc::error_response&>(fail_resp), response_info.m_body); \
     return true; \
   } \
-  uint64_t ticks2 = epee::misc_utils::get_tick_count(); \
-  epee::serialization::store_t_to_json(resp, response_info.m_body); \
-  uint64_t ticks3 = epee::misc_utils::get_tick_count(); \
-  response_info.m_mime_tipe = "application/json"; \
-  response_info.m_header_info.m_content_type = " application/json"; \
-  LOG_PRINT( query_info.m_URI << "[" << method_name << "] processed with " << ticks1-ticks << "/"<< ticks2-ticks1 << "/" << ticks3-ticks2 << "ms", LOG_LEVEL_2); \
+  FINALIZE_OBJECTS_TO_JSON(method_name) \
   return true;\
 }
 
+#define MAP_JON_RPC_N(callback_f, command_type) MAP_JON_RPC(command_type::methodname(), callback_f, command_type)
 
 #define END_JSON_RPC_MAP() \
   epee::json_rpc::error_response rsp; \
+  rsp.id = id_; \
   rsp.jsonrpc = "2.0"; \
   rsp.error.code = -32601; \
   rsp.error.message = "Method not found"; \

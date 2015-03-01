@@ -39,16 +39,23 @@
 #include <list>
 #include <map>
 #include <time.h>
+#ifndef Q_MOC_RUN
 #include <boost/cstdint.hpp>
 #include <boost/thread.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string.hpp>
-
+#endif
 #if defined(WIN32)
 #include <io.h>
 #else
 #include <unistd.h>
 #endif
+
+#include "warnings.h"
+PUSH_WARNINGS
+DISABLE_VS_WARNINGS(4100)
+
+
 
 #include "static_initializer.h"
 #include "string_tools.h"
@@ -367,6 +374,7 @@ namespace log_space
         m_have_to_kill_console = false;
 
       ::AllocConsole();
+      freopen("CONOUT$", "w", stdout);
 #endif
     }
 
@@ -854,13 +862,14 @@ namespace log_space
 
     bool init_log_path_by_default()
     {
+      m_default_log_file =  m_process_name;
+      std::string::size_type a = m_default_log_file.rfind('.');
+      if (a != std::string::npos)
+        m_default_log_file.erase(a, m_default_log_file.size());
+
       //load process name
       m_default_log_folder = string_tools::get_current_module_folder();
 
-      m_default_log_file =  m_process_name;
-      std::string::size_type a = m_default_log_file.rfind('.');
-      if ( a != std::string::npos )
-        m_default_log_file.erase( a, m_default_log_file.size());
       m_default_log_file += ".log";
 
       return true;
@@ -1321,10 +1330,8 @@ POP_WARNINGS
 #define LOG_PRINT_NO_PREFIX_NO_POSTFIX2(log_name, x, y) {if ( y <= epee::log_space::log_singletone::get_log_detalisation_level() )\
   {std::stringstream ss________; ss________ << x; epee::log_space::log_singletone::do_log_message(ss________.str(), y, epee::log_space::console_color_default, false, log_name);}}
 
-
 #define LOG_PRINT_NO_POSTFIX2(log_name, x, y) {if ( y <= epee::log_space::log_singletone::get_log_detalisation_level() )\
   {std::stringstream ss________; ss________ << epee::log_space::log_singletone::get_prefix_entry() << x; epee::log_space::log_singletone::do_log_message(ss________.str(), y, epee::log_space::console_color_default, false, log_name);}}
-
 
 #define LOG_PRINT2(log_name, x, y) {if ( y <= epee::log_space::log_singletone::get_log_detalisation_level() )\
   {std::stringstream ss________; ss________ << epee::log_space::log_singletone::get_prefix_entry() << x << std::endl;epee::log_space::log_singletone::do_log_message(ss________.str(), y, epee::log_space::console_color_default, false, log_name);}}
@@ -1332,13 +1339,19 @@ POP_WARNINGS
 #define LOG_PRINT_COLOR2(log_name, x, y, color) {if ( y <= epee::log_space::log_singletone::get_log_detalisation_level() )\
   {std::stringstream ss________; ss________ << epee::log_space::log_singletone::get_prefix_entry() << x << std::endl;epee::log_space::log_singletone::do_log_message(ss________.str(), y, color, false, log_name);}}
 
-
 #define LOG_PRINT2_JORNAL(log_name, x, y) {if ( y <= epee::log_space::log_singletone::get_log_detalisation_level() )\
   {std::stringstream ss________; ss________ << epee::log_space::log_singletone::get_prefix_entry() << x << std::endl;epee::log_space::log_singletone::do_log_message(ss________.str(), y, epee::log_space::console_color_default, true, log_name);}}
 
 
+
+#if defined(_MSC_VER)
+#define LOCAL_FUNCTION_DEF__ __FUNCTION__
+#else
+#define LOCAL_FUNCTION_DEF__ __PRETTY_FUNCTION__ 
+#endif 
+
 #define LOG_ERROR2(log_name, x) { \
-  std::stringstream ss________; ss________ << epee::log_space::log_singletone::get_prefix_entry() << "ERROR " << __FILE__ << ":" << __LINE__ << " " << x << std::endl; epee::log_space::log_singletone::do_log_message(ss________.str(), LOG_LEVEL_0, epee::log_space::console_color_red, true, log_name);LOCAL_ASSERT(0); epee::log_space::log_singletone::get_set_err_count(true, epee::log_space::log_singletone::get_set_err_count()+1);}
+  std::stringstream ss________; ss________ << epee::log_space::log_singletone::get_prefix_entry() << "ERROR " << __FILE__ << ":" << __LINE__ << "[" << LOCAL_FUNCTION_DEF__ << "]" << x << std::endl; epee::log_space::log_singletone::do_log_message(ss________.str(), LOG_LEVEL_0, epee::log_space::console_color_red, true, log_name);LOCAL_ASSERT(0); epee::log_space::log_singletone::get_set_err_count(true, epee::log_space::log_singletone::get_set_err_count()+1);}
 
 #define LOG_FRAME2(log_name, x, y) epee::log_space::log_frame frame(x, y, log_name)
 
@@ -1393,7 +1406,7 @@ POP_WARNINGS
 #define LOG_PRINT_L4(mess)        LOG_PRINT(mess, LOG_LEVEL_4)
 #define LOG_PRINT_J(mess, level)        LOG_PRINT2_JORNAL(LOG_DEFAULT_TARGET, mess, level)
 
-#define LOG_ERROR(mess)           LOG_ERROR2(LOG_DEFAULT_TARGET, mess)
+#define LOG_ERROR(mess)               LOG_ERROR2(LOG_DEFAULT_TARGET, mess)
 #define LOG_FRAME(mess, level)        LOG_FRAME2(LOG_DEFAULT_TARGET, mess, level)
 #define LOG_VALUE(mess, level)        LOG_VALUE2(LOG_DEFAULT_TARGET, mess, level)
 #define LOG_ARRAY(mess, level)        LOG_ARRAY2(LOG_DEFAULT_TARGET, mess, level)
@@ -1425,6 +1438,7 @@ POP_WARNINGS
 
 
 #define ASSERT_MES_AND_THROW(message) {LOG_ERROR(message); std::stringstream ss; ss << message; throw std::runtime_error(ss.str());}
+
 #define CHECK_AND_ASSERT_THROW_MES(expr, message) {if(!(expr)) ASSERT_MES_AND_THROW(message);}
 
 
@@ -1438,10 +1452,18 @@ POP_WARNINGS
 #define CHECK_AND_ASSERT_MES(expr, fail_ret_val, message)   do{if(!(expr)) {LOG_ERROR(message); return fail_ret_val;};}while(0)
 #endif
 
+/*#ifndef CHECK_AND_ASSERT_MES_AND_THROW
+#define CHECK_AND_ASSERT_MES_AND_THROW(expr, message)   do{if(!(expr)) {LOG_ERROR(message); throw std::runtime_error(message);};}while(0)
+#endif
+*/
+
 #ifndef CHECK_AND_NO_ASSERT_MES
 #define CHECK_AND_NO_ASSERT_MES(expr, fail_ret_val, message)   do{if(!(expr)) {LOG_PRINT_L0(message); /*LOCAL_ASSERT(expr);*/ return fail_ret_val;};}while(0)
 #endif
 
+#ifndef CHECK_AND_NO_ASSERT_MES_LEVEL
+#define CHECK_AND_NO_ASSERT_MES_LEVEL(expr, fail_ret_val, message, log_level)   do{if(!(expr)) {LOG_PRINT(message, log_level); return fail_ret_val;};}while(0)
+#endif
 
 #ifndef CHECK_AND_ASSERT_MES_NO_RET
 #define CHECK_AND_ASSERT_MES_NO_RET(expr, message)   do{if(!(expr)) {LOG_ERROR(message); return;};}while(0)
@@ -1452,5 +1474,9 @@ POP_WARNINGS
 #define CHECK_AND_ASSERT_MES2(expr, message)   do{if(!(expr)) {LOG_ERROR(message); };}while(0)
 #endif
 
+
 }
+
+POP_WARNINGS
+
 #endif //_MISC_LOG_EX_H_

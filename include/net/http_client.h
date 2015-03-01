@@ -248,6 +248,13 @@ using namespace std;
 				CRITICAL_REGION_LOCAL(m_lock);
 				m_host_buff = name;
 			}
+
+			boost::asio::ip::tcp::socket& get_socket()
+			{
+				return m_net_client.get_socket();
+			}
+
+			
       bool connect(const std::string& host, int port, unsigned int timeout)
       {
         return connect(host, std::to_string(port), timeout);
@@ -856,7 +863,7 @@ using namespace std;
       http::url_content u_c;
       bool res = parse_url(url, u_c);
 
-      if(!tr.is_connected())
+      if(!tr.is_connected() && !u_c.host.empty())
       {
         CHECK_AND_ASSERT_MES(res, false, "failed to parse url: " << url);
 

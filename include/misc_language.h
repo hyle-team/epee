@@ -49,8 +49,15 @@ namespace epee
 	}
 
 
+  /* helper class, to make able get namespace via decltype()::*/
+  template<class base_class>
+  class namespace_accessor: public base_class{};
 
 #define AUTO_VAL_INIT(v)   boost::value_initialized<decltype(v)>()
+
+#define STRINGIFY_EXPAND(s) STRINGIFY(s)
+#define STRINGIFY(s) #s
+
 
 namespace misc_utils
 {
@@ -157,6 +164,19 @@ namespace misc_utils
     auto_scope_leave_caller slc(new call_befor_die<t_scope_leave_handler>(f));
     return slc;
   }
+
+    template< typename t_contaner, typename t_redicate>
+    void erase_if( t_contaner& items, const t_redicate& predicate ) 
+    {
+      for(auto it = items.begin(); it != items.end(); ) 
+      {
+        if( predicate(*it) ) 
+          it = items.erase(it);
+        else 
+          ++it;
+      }
+    };
+
 
 }
 }

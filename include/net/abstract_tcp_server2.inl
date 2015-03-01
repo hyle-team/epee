@@ -35,9 +35,9 @@
 #include <boost/utility/value_init.hpp>
 #include <boost/asio/deadline_timer.hpp>
 #include "misc_language.h"
-#include "pragma_comp_defs.h"
+#include "warnings.h"
 
-PRAGMA_WARNING_PUSH
+PUSH_WARNINGS
 namespace epee
 {
 namespace net_utils
@@ -45,7 +45,7 @@ namespace net_utils
   /************************************************************************/
   /*                                                                      */
   /************************************************************************/
-PRAGMA_WARNING_DISABLE_VS(4355)
+DISABLE_VS_WARNINGS(4355)
 
   template<class t_protocol_handler>
   connection<t_protocol_handler>::connection(boost::asio::io_service& io_service,
@@ -60,7 +60,7 @@ PRAGMA_WARNING_DISABLE_VS(4355)
   {
     boost::interprocess::ipcdetail::atomic_inc32(&m_ref_sockets_count);
   }
-PRAGMA_WARNING_DISABLE_VS(4355)
+DISABLE_VS_WARNINGS(4355)
   //---------------------------------------------------------------------------------
   template<class t_protocol_handler>
   connection<t_protocol_handler>::~connection()
@@ -103,13 +103,18 @@ PRAGMA_WARNING_DISABLE_VS(4355)
     // Use safe_shared_from_this, because of this is public method and it can be called on the object being deleted
     auto self = safe_shared_from_this();
     if(!self)
+    {
+      LOG_PRINT_RED("Failed to start conntection, failed to call safe_shared_from_this", LOG_LEVEL_2);
       return false;
+    }
 
     m_is_multithreaded = is_multithreaded;
 
     boost::system::error_code ec;
     auto remote_ep = socket_.remote_endpoint(ec);
-    CHECK_AND_NO_ASSERT_MES(!ec, false, "Failed to get remote endpoint: " << ec.message() << ':' << ec.value());
+    CHECK_AND_NO_ASSERT_MES(!m_was_shutdown, false, "was shutdown on start connection");
+    
+    CHECK_AND_NO_ASSERT_MES_LEVEL(!ec, false, "Failed to get remote endpoint(" << (is_income?"INT":"OUT") << "): " << ec.message() << ':' << ec.value(), LOG_LEVEL_2);
 
     auto local_ep = socket_.local_endpoint(ec);
     CHECK_AND_NO_ASSERT_MES(!ec, false, "Failed to get local endpoint: " << ec.message() << ':' << ec.value());
@@ -118,13 +123,15 @@ PRAGMA_WARNING_DISABLE_VS(4355)
     long ip_ = boost::asio::detail::socket_ops::host_to_network_long(remote_ep.address().to_v4().to_ulong());
 
     context.set_details(boost::uuids::random_generator()(), ip_, remote_ep.port(), is_income);
-    LOG_PRINT_L3("[sock " << socket_.native_handle() << "] new connection from " << print_connection_context_short(context) <<
-      " to " << local_ep.address().to_string() << ':' << local_ep.port() <<
-      ", total sockets objects " << m_ref_sockets_count);
+    context.m_last_send = context.m_last_recv = time(NULL);
+   
+    LOG_PRINT_L3("[sock " << socket_.native_handle() << "] new connection, remote end_point: " << print_connection_context_short(context) <<
+        " local end_point: " << local_ep.address().to_string() << ':' << local_ep.port() <<
+        ", total sockets objects " << m_ref_sockets_count);
 
-    if(m_pfilter && !m_pfilter->is_remote_ip_allowed(context.m_remote_ip))
+    if(is_income && m_pfilter && !m_pfilter->is_remote_ip_allowed(context.m_remote_ip))
     {
-      LOG_PRINT_L2("[sock " << socket_.native_handle() << "] ip denied " << string_tools::get_ip_string_from_int32(context.m_remote_ip) << ", shutdowning connection");
+      LOG_PRINT_L0("[sock " << socket_.native_handle() << "] ip denied " << string_tools::get_ip_string_from_int32(context.m_remote_ip) << ", shutdowning connection");
       close();
       return false;
     }
@@ -633,9 +640,7 @@ POP_WARNINGS
         boost::bind(&boosted_tcp_server<t_protocol_handler>::handle_accept, this,
         boost::asio::placeholders::error));
 
-      bool r = conn->start(true, 1 < m_threads_count);
-      if (!r)
-        LOG_ERROR("[sock " << conn->socket().native_handle() << "] Failed to start connection, connections_count = " << m_sockets_count);
+      conn->start(true, 1 < m_threads_count);
     }else
     {
       LOG_ERROR("Some problems at accept: " << e.message() << ", connections_count = " << m_sockets_count);
@@ -724,10 +729,6 @@ POP_WARNINGS
       new_connection_l->get_context(conn_context);
       //new_connection_l.reset(new connection<t_protocol_handler>(io_service_, m_config, m_sockets_count, m_pfilter));
     }
-    else
-    {
-      LOG_ERROR("[sock " << new_connection_->socket().native_handle() << "] Failed to start connection, connections_count = " << m_sockets_count);
-    }
 
     return r;
 
@@ -783,7 +784,12 @@ POP_WARNINGS
           if(!sh_deadline->cancel())
           {
             cb(conn_context, boost::asio::error::operation_aborted);//this mean that deadline timer already queued callback with cancel operation, rare situation
-          }else
+          }else if(new_connection_l->is_shutdown())
+          {
+            //if deadline timer started and finished callback right after async_connect callback is started and before deadline timer sh_deadline->cancel() is called 
+            cb(conn_context, boost::asio::error::operation_aborted);
+          }
+          else
           {
             LOG_PRINT_L3("[sock " << new_connection_l->socket().native_handle() << "] Connected success to " << adr << ':' << port <<
               " from " << lep.address().to_string() << ':' << lep.port());
@@ -795,7 +801,6 @@ POP_WARNINGS
             }
             else
             {
-              LOG_PRINT_L3("[sock " << new_connection_l->socket().native_handle() << "] Failed to start connection to " << adr << ':' << port);
               cb(conn_context, boost::asio::error::fault);
             }
           }
@@ -811,4 +816,4 @@ POP_WARNINGS
   }
 }
 }
-PRAGMA_WARNING_POP
+POP_WARNINGS
