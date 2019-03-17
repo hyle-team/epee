@@ -29,15 +29,14 @@
 extern "C" { 
 #include "zlib/zlib.h"
 }
-#pragma comment(lib, "zlibstat.lib")
 
 namespace epee 
 {
 namespace zlib_helper
 {
-	inline 
-	bool pack(std::string& target){
-		std::string result_packed_buff;
+	inline 	bool pack(const std::string& target, std::string& result_packed_buff)
+{
+		result_packed_buff.clear();
 
 		z_stream    zstream = {0};
 		int ret = deflateInit(&zstream, Z_DEFAULT_COMPRESSION);
@@ -60,30 +59,36 @@ namespace zlib_helper
 
 			
 			result_packed_buff.erase(0, 2);
-			target.swap(result_packed_buff);
 		}
 
 		deflateEnd(& zstream );
 		return true;
 	}
 
-	inline bool unpack(std::string& target)
+	inline 	bool pack(std::string& target)
+	{
+		std::string result_packed_buff;
+		bool r = pack(target, result_packed_buff);
+		if (r)
+			result_packed_buff.swap(target);
+		return r;
+	}
+
+	inline bool unpack(const std::string& target, std::string& decode_summary_buff)
 	{
 		z_stream    zstream = {0};
 		int ret = inflateInit(&zstream);//
 
-		std::string decode_summary_buff;
+		decode_summary_buff.clear();
 		size_t	ungzip_buff_size = target.size() * 0x30;
 		std::string current_decode_buff(ungzip_buff_size, 'X');
 
-		while(target.size())
-		{
+    uInt current_offset = 0;
 
-			
+    while (target.size() > current_offset)
+		{
 			zstream.next_out = (Bytef*)current_decode_buff.data();
 			zstream.avail_out = (uInt)ungzip_buff_size;
-
-			int flag = Z_SYNC_FLUSH;
 			
 			static char dummy_head[2] =
 			{
@@ -99,8 +104,8 @@ namespace zlib_helper
 				return false;
 			}
 			
-			zstream.next_in = (Bytef*)target.data();
-			zstream.avail_in = (uInt)target.size();
+      zstream.next_in = (Bytef*)target.data() + current_offset;
+      zstream.avail_in = (uInt)target.size() - current_offset;
 
 			ret = inflate(&zstream, Z_SYNC_FLUSH);
 			if (ret != Z_OK && ret != Z_STREAM_END)
@@ -110,8 +115,8 @@ namespace zlib_helper
 			}
 
 			
-			target.erase(0, target.size()-zstream.avail_in);
-
+			//target.erase(0, target.size()-zstream.avail_in);
+      current_offset += zstream.total_in;
 			
 			if(ungzip_buff_size == zstream.avail_out)
 			{
@@ -131,8 +136,17 @@ namespace zlib_helper
 
 		inflateEnd(&zstream );
 
-		decode_summary_buff.swap(target);
-		return 1;
+		
+		return true;
+	}
+
+	inline 	bool unpack(std::string& target)
+	{
+		std::string decode_summary_buff;
+		bool r = unpack(target, decode_summary_buff);
+		if (r)
+			decode_summary_buff.swap(target);
+		return r;
 	}
 
 };

@@ -32,6 +32,10 @@
 #include <boost/uuid/uuid_generators.hpp>
 #include "levin_base.h"
 
+
+#undef LOG_DEFAULT_CHANNEL 
+#define LOG_DEFAULT_CHANNEL "net_protocol"
+
 namespace epee
 {
 namespace levin
@@ -161,17 +165,11 @@ namespace levin
 
 		return true;
 	}
-
-
-
-
-
-
-
 }
 }
 
-
+#undef LOG_DEFAULT_CHANNEL 
+#define LOG_DEFAULT_CHANNEL NULL
 
 
 #endif //_LEVIN_PROTOCOL_HANDLER_H_

@@ -24,26 +24,47 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
-
-
-#ifndef _MUNIN_NODE_SERVER_H_
-#define _MUNIN_NODE_SERVER_H_
-
-#include <string>
-//#include "net_utils_base.h"
-#include "munin_connection_handler.h"
-//#include "abstract_tcp_server.h"
-//#include "abstract_tcp_server_cp.h"
-#include "abstract_tcp_server2.h"
+#pragma once
+#include "misc_language.h"
 namespace epee
 {
-namespace net_utils
-{
-	namespace munin
+
+  template<class t_obj>
+  struct enableable
+  {
+    t_obj v;
+    bool enabled;
+
+    enableable()
+      : v(t_obj()), enabled(true)
+    {	// construct from defaults
+    }
+
+    enableable(const t_obj& _v)
+      : v(_v), enabled(true)
+    {	// construct from specified values
+    }
+
+    enableable(const enableable<t_obj>& _v)
+      : v(_v.v), enabled(_v.enabled)
+    {	// construct from specified values
+    }
+  };
+
+	//basic helpers for pod-to-hex serialization 
+	template<class t_pod_type>
+	std::string transform_t_pod_to_str(const t_pod_type & a)
 	{
-		typedef boosted_tcp_server<munin_node_server_connection_handler> munin_node_server;
-		//typedef cp_server_impl<munin_node_server_connection_handler> munin_node_cp_server;
+		return epee::string_tools::pod_to_hex(a);
 	}
+	template<class t_pod_type>
+	t_pod_type transform_str_to_t_pod(const std::string& a)
+	{
+		t_pod_type res = AUTO_VAL_INIT(res);
+		epee::string_tools::hex_to_pod(a, res);
+		return res;
+	}
+	//-------------------------------------------------------------------------------------------------------------------
+
+
 }
-}
-#endif//!_MUNIN_NODE_SERVER_H_

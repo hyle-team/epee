@@ -43,7 +43,7 @@ namespace epee
     {
 PUSH_WARNINGS
 DISABLE_VS_WARNINGS(4018)
-      CHECK_AND_ASSERT_THROW_MES(from >=0, "unexpected int value with signed storage value less than 0, and unsigned receiver value");
+      CHECK_AND_ASSERT_THROW_MES(from >=0, "unexpected int value with signed storage value less than 0, and unsigned receiver value: " << from);
 DISABLE_GCC_AND_CLANG_WARNING(sign-compare)
       CHECK_AND_ASSERT_THROW_MES(from <= std::numeric_limits<to_type>::max(), "int value overhead: try to set value " << from << " to type " << typeid(to_type).name() << " with max possible value = " << std::numeric_limits<to_type>::max());
       to = static_cast<to_type>(from);
@@ -159,6 +159,14 @@ POP_WARNINGS
       }
     };
 
+    inline void convert_t(const uint64_t& from, double& to)
+    {
+      to = static_cast<double>(from);
+    }
+    inline void convert_t(const int64_t& from, double& to)
+    {
+      to = static_cast<double>(from);
+    }
 
     template<class from_type, class to_type>
     void convert_t(const from_type& from, to_type& to)

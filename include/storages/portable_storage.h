@@ -158,7 +158,7 @@ namespace epee
         pbuff->m_signature_b != PORTABLE_STORAGE_SIGNATUREB 
         )
       {
-        LOG_ERROR("portable_storage: wrong binary format - signature missmatch");
+        LOG_PRINT_RED_L0("portable_storage: wrong binary format - signature missmatch");
         return false;
       }
       if(pbuff->m_ver != PORTABLE_STORAGE_FORMAT_VER)
@@ -427,7 +427,7 @@ namespace epee
       TRY_ENTRY();
       CHECK_AND_ASSERT(hsec_array, false);
       if(hsec_array->type() != typeid(array_entry_t<section>))
-        return nullptr;
+        return false;
       array_entry_t<section>& sec_array = boost::get<array_entry_t<section>>(*hsec_array);
       h_child_section = sec_array.get_next_val();
       if(!h_child_section)

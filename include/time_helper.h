@@ -121,6 +121,11 @@ POP_WARNINGS
 	{
 		std::string res;
 		time_t tail = time_;
+		if (tail < 0)
+		{
+			tail = -tail;
+			res = "-";
+		}
 PUSH_WARNINGS
 DISABLE_VS_WARNINGS(4244)
 		int days = tail/(60*60*24);
@@ -131,7 +136,7 @@ DISABLE_VS_WARNINGS(4244)
 		tail = tail%(60);
 		int seconds = tail;
 POP_WARNINGS
-		res = std::string() + "d" + boost::lexical_cast<std::string>(days) + ".h" + boost::lexical_cast<std::string>(hours) + ".m" + boost::lexical_cast<std::string>(minutes) + ".s" + boost::lexical_cast<std::string>(seconds);
+		res += std::string("d") + boost::lexical_cast<std::string>(days) + ".h" + boost::lexical_cast<std::string>(hours) + ".m" + boost::lexical_cast<std::string>(minutes) + ".s" + boost::lexical_cast<std::string>(seconds);
 		return res;
 	}
 

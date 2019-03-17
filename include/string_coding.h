@@ -29,40 +29,41 @@
 #define _STRING_CODING_H_
 
 #include <string>
-//#include "md5_l.h"
+#include <locale>
+#include <boost/locale/encoding_utf.hpp>
+#ifdef WIN32
+  #ifndef NOMINMAX
+    #define NOMINMAX
+  #endif
+  #include <windows.h>
+#endif
+
 namespace epee
 {
 namespace string_encoding
 {
+
+  inline std::wstring utf8_to_wstring(const std::string& str)
+  {
+    return boost::locale::conv::utf_to_utf<wchar_t>(str.c_str(), str.c_str() + str.size());
+  }
+
+  inline std::string wstring_to_utf8(const std::wstring& str)
+  {
+    return boost::locale::conv::utf_to_utf<char>(str.c_str(), str.c_str() + str.size());
+  }
+
+  
+  
+  
+
 	inline std::string convert_to_ansii(const std::wstring& str_from)
 	{
 		
 		std::string res(str_from.begin(), str_from.end());
 		return res;
-		/*
-		std::string result;
-		std::locale loc;
-		for(unsigned int i= 0; i < str_from.size(); ++i)
-		{
-			result += std::use_facet<std::ctype<wchar_t> >(loc).narrow(str_from[i]);
-		}
-		return result;
-		*/
-		
-		//return boost::lexical_cast<std::string>(str_from);
-		/*
-		std::string str_trgt;
-		if(!str_from.size())
-			return str_trgt;
-		int cb = ::WideCharToMultiByte( code_page, 0, str_from.data(), (__int32)str_from.size(), 0, 0, 0, 0  );
-		if(!cb)
-			return str_trgt;
-		str_trgt.resize(cb);
-		::WideCharToMultiByte(  code_page, 0, str_from.data(), (int)str_from.size(), 
-			                        (char*)str_trgt.data(), (int)str_trgt.size(), 0, 0);
-		return str_trgt;*/
 	}
-#ifdef WINDOWS_PLATFORM_EX
+#ifdef WIN32
 	inline std::string convert_to_ansii_win(const std::wstring& str_from)
 	{
 		
@@ -79,37 +80,39 @@ namespace string_encoding
 		return str_trgt;
 	}
 #endif
-
+  
 	inline std::string convert_to_ansii(const std::string& str_from)
 	{
 		return str_from;
 	}
+#ifdef WIN32
+  inline std::wstring convert_to_unicode(const std::string& str_from)
+  {
+    std::wstring str_trgt;
+    if(!str_from.size())
+    return str_trgt;
 
-	inline std::wstring convert_to_unicode(const std::string& str_from)
-	{
-		std::wstring result;
-		std::locale loc;
-		for(unsigned int i= 0; i < str_from.size(); ++i)
-		{
-			result += std::use_facet<std::ctype<wchar_t> >(loc).widen(str_from[i]);
-		}
-		return result;
-		
-		//return boost::lexical_cast<std::wstring>(str_from);
-		/*
-		std::wstring str_trgt;
-		if(!str_from.size())
-			return str_trgt;
+    int cb = ::MultiByteToWideChar(CP_ACP, 0, str_from.data(), (int)str_from.size(), 0, 0);
+    if(!cb)
+    return str_trgt;
 
-		int cb = ::MultiByteToWideChar( code_page, 0, str_from.data(), (int)str_from.size(), 0, 0 );
-		if(!cb)
-			return str_trgt;
-
-		str_trgt.resize(cb);
-		::MultiByteToWideChar( code_page, 0, str_from.data(),(int)str_from.size(), 
-								(wchar_t*)str_trgt.data(),(int)str_trgt.size());
-		return str_trgt;*/
-	}
+    str_trgt.resize(cb);
+    ::MultiByteToWideChar(CP_ACP, 0, str_from.data(), (int)str_from.size(),
+    (wchar_t*)str_trgt.data(),(int)str_trgt.size());
+    return str_trgt;
+  }
+#else
+  inline std::wstring convert_to_unicode(const std::string& str_from)
+  {
+    std::wstring result;
+    std::locale loc__;
+    for (unsigned int i = 0; i < str_from.size(); ++i)
+    {
+      result += std::use_facet<std::ctype<wchar_t> >(loc__).widen(str_from[i]);
+    }
+    return result;
+  }
+#endif
 	inline std::wstring convert_to_unicode(const std::wstring& str_from)
 	{
 		return str_from;
@@ -144,6 +147,22 @@ namespace string_encoding
 	{
 		return convert_to_unicode(str_from);
 	}
+  
+#ifdef WIN32
+  inline std::string convert_ansii_to_utf8(const std::string& str_from)
+  {
+    try
+    {
+      
+      std::wstring wstr = epee::string_encoding::convert_to_unicode(str_from);
+      return epee::string_encoding::wstring_to_utf8(wstr);
+    }
+    catch(...)
+    {
+      return "BAD_CAST";
+    }
+  }
+#endif
 
 	inline 
 	std::string& base64_chars()

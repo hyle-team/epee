@@ -48,6 +48,8 @@ namespace epee
     void dump_as_json(t_stream& strm, const uint8_t& v, size_t indent);
     template<class t_stream>
     void dump_as_json(t_stream& strm, const bool& v, size_t indent);
+    template<class t_stream>
+    void dump_as_json(t_stream& strm, const double& v, size_t indent);
     template<class t_stream, class t_type>
     void dump_as_json(t_stream& strm, const t_type& v, size_t indent);
     template<class t_stream>
@@ -116,7 +118,7 @@ namespace epee
     template<class t_stream>
     void dump_as_json(t_stream& strm, const std::string& v, size_t indent)
     {
-      strm << "\"" << misc_utils::parse::transform_to_escape_sequence(v) << "\"";
+      strm << "\"" << misc_utils::parse::transform_to_json_escape_sequence(v) << "\"";
     }
 
     template<class t_stream>
@@ -140,7 +142,12 @@ namespace epee
         strm << "false";
     }
 
-
+    template<class t_stream>
+    void dump_as_json(t_stream& strm, const double& v, size_t indent)
+    {
+      strm.precision(8);
+      strm << std::fixed << v;
+    }
 
     template<class t_stream, class t_type>
     void dump_as_json(t_stream& strm, const t_type& v, size_t /*indent*/)
@@ -159,7 +166,7 @@ namespace epee
         auto it_last = --sec.m_entries.end();
         for(auto it = sec.m_entries.begin(); it!= sec.m_entries.end();it++)
         {
-          strm << indent_str << "\"" << misc_utils::parse::transform_to_escape_sequence(it->first) << "\"" << ": ";
+          strm << indent_str << "\"" << misc_utils::parse::transform_to_json_escape_sequence(it->first) << "\"" << ": ";
           dump_as_json(strm, it->second, local_indent);
           if(it_last != it)
             strm << ",";

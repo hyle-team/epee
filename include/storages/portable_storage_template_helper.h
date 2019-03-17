@@ -56,7 +56,7 @@ namespace epee
     }
     //-----------------------------------------------------------------------------------------------------------
     template<class t_struct>
-    bool store_t_to_json(t_struct& str_in, std::string& json_buff, size_t indent = 0)
+    bool store_t_to_json(const t_struct& str_in, std::string& json_buff, size_t indent = 0)
     {
       portable_storage ps;
       str_in.store(ps);
@@ -65,15 +65,15 @@ namespace epee
     }
     //-----------------------------------------------------------------------------------------------------------
     template<class t_struct>
-    std::string store_t_to_json(t_struct& str_in, size_t indent = 0)
+    std::string store_t_to_json(const t_struct& str_in, size_t indent = 0)
     {
       std::string json_buff;
       store_t_to_json(str_in, json_buff, indent);
-      return std::move(json_buff);
+      return json_buff;
     }
     //-----------------------------------------------------------------------------------------------------------
     template<class t_struct>
-    bool store_t_to_json_file(t_struct& str_in, const std::string& fpath)
+    bool store_t_to_json_file(const t_struct& str_in, const std::string& fpath)
     {
       std::string json_buff;
       store_t_to_json(str_in, json_buff);
@@ -104,7 +104,7 @@ namespace epee
 PUSH_WARNINGS
 DISABLE_VS_WARNINGS(4100)
     template<class t_struct>
-    bool store_t_to_binary(t_struct& str_in, std::string& binary_buff, size_t indent = 0)
+    bool store_t_to_binary(const t_struct& str_in, std::string& binary_buff, size_t indent = 0)
     {
       portable_storage ps;
       str_in.store(ps);
@@ -113,11 +113,11 @@ DISABLE_VS_WARNINGS(4100)
 POP_WARNINGS
     //-----------------------------------------------------------------------------------------------------------
     template<class t_struct>
-    std::string store_t_to_binary(t_struct& str_in, size_t indent = 0)
+    std::string store_t_to_binary(const t_struct& str_in, size_t indent = 0)
     {
       std::string binary_buff;
       store_t_to_binary(str_in, binary_buff, indent);
-      return std::move(binary_buff);
+      return binary_buff;
     }
   }
 }

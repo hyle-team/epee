@@ -34,7 +34,7 @@
 
 #include <iostream>
 #include <boost/filesystem.hpp>
-
+#include <boost/filesystem/fstream.hpp>
 
 #ifndef MAKE64
 	#define MAKE64(low,high)	((__int64)(((DWORD)(low)) | ((__int64)((DWORD)(high))) << 32))
@@ -45,10 +45,13 @@
 #include <strsafe.h>
 #include <string.h>
 #include <mbstring.h>
-
 #endif
 
+#ifndef  WIN32
+#include <sys/file.h>
+#endif
 
+#include "include_base_utils.h"
 
 namespace epee
 {
@@ -219,8 +222,9 @@ namespace file_io_utils
 		return str_result;
 	}
 #endif
-	inline 
-		bool is_file_exist(const std::string& path)
+	 
+  template<class t_string>
+  bool is_file_exist(const t_string& path)
 	{
 		boost::filesystem::path p(path);
 		return boost::filesystem::exists(p);
@@ -254,20 +258,30 @@ namespace file_io_utils
 	}*/
 
 
+  template<class t_string>
+  bool save_string_to_file_throw(const t_string& path_to_file, const std::string& str)
+  {
+      //std::ofstream fstream;
+      boost::filesystem::ofstream fstream;
+      fstream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+      fstream.open(path_to_file, std::ios_base::binary | std::ios_base::out | std::ios_base::trunc);
+      fstream << str;
+      fstream.close();
+      return true;
+  }
 
-	inline
-		bool save_string_to_file(const std::string& path_to_file, const std::string& str)
+	template<class t_string>
+  bool save_string_to_file(const t_string& path_to_file, const std::string& str)
 	{
 
 		try
 		{
-			std::ofstream fstream;
-			fstream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-			fstream.open(path_to_file, std::ios_base::binary | std::ios_base::out | std::ios_base::trunc);
-			fstream << str;
-			fstream.close();
-			return true;
+      return save_string_to_file_throw(path_to_file, str);
 		}
+    catch (const std::exception& /*ex*/)
+    {
+      return false;
+    }
 
 		catch(...)
 		{
@@ -330,11 +344,12 @@ namespace file_io_utils
 		try
 		{
 			std::ifstream fstream;
-			fstream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+			//fstream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
 			fstream.open(path_to_file, std::ios_base::binary | std::ios_base::in | std::ios::ate);
-
+      if (!fstream.good())
+        return false;
 			std::ifstream::pos_type file_size = fstream.tellg();
-			
+
 			if(file_size > 1000000000)
 				return false;//don't go crazy
 			size_t file_size_t = static_cast<size_t>(file_size);
@@ -343,6 +358,9 @@ namespace file_io_utils
 
 			fstream.seekg (0, std::ios::beg);
 			fstream.read((char*)target_str.data(), target_str.size());
+      if (!fstream.good())
+        return false;
+
 			fstream.close();
 			return true;
 		}
@@ -353,6 +371,103 @@ namespace file_io_utils
 		}
 	}
 
+#ifdef WIN32
+  typedef HANDLE native_filesystem_handle;
+#else
+  typedef int native_filesystem_handle;
+#endif
+
+  inline bool open_and_lock_file(const std::string file_path, native_filesystem_handle& h_file)
+  {
+#ifdef WIN32
+    h_file = ::CreateFileA(file_path.c_str(),                // name of the write
+      GENERIC_WRITE,          // open for writing
+      0,                      // do not share
+      NULL,                   // default security
+      OPEN_ALWAYS,             // create new file only
+      FILE_ATTRIBUTE_NORMAL,  // normal file
+      NULL);                  // no attr. template
+    if (h_file == INVALID_HANDLE_VALUE)
+      return false;
+    else
+      return true;
+#else
+    h_file = open(file_path.c_str(), O_RDWR | O_CREAT, 0666); // open or create lockfile
+    if (h_file < 0)
+      return false;
+    //check open success...
+    int rc = flock(h_file, LOCK_EX | LOCK_NB); // grab exclusive lock, fail if can't obtain.
+    if (rc < 0)
+    {
+      return false;
+    }
+    return true;
+#endif
+  }
+
+  inline bool unlock_and_close_file(native_filesystem_handle& h_file)
+  {
+#ifdef WIN32
+    ::CloseHandle(h_file);                  // no attr. template
+#else
+    flock(h_file, LOCK_UN); // grab exclusive lock, fail if can't obtain.
+    close(h_file);
+#endif
+    return true;
+  }
+
+
+  inline
+    bool load_last_n_from_file_to_string(const std::string& path_to_file, uint64_t size_to_load, std::string& target_str)
+  {
+      try
+      {
+        std::ifstream fstream;
+        //fstream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+        fstream.open(path_to_file, std::ios_base::binary | std::ios_base::in | std::ios::ate);
+        if (!fstream.good())
+          return false;
+        std::ifstream::pos_type file_size = fstream.tellg();
+         
+        uint64_t size_to_load_to_buff = file_size;
+        if (static_cast<uint64_t>(file_size) >  size_to_load)
+        {
+          fstream.seekg(size_to_load_to_buff - size_to_load, std::ios::beg);
+          size_to_load_to_buff = size_to_load;
+        }else 
+        {
+          fstream.seekg(0, std::ios::beg);
+        }
+
+        size_t size_to_load_to_buff_t = static_cast<size_t>(size_to_load_to_buff);
+
+        target_str.resize(size_to_load_to_buff_t);
+
+
+        fstream.read((char*)target_str.data(), target_str.size());
+        if (!fstream.good())
+          return false;
+
+        fstream.close();
+        return true;
+      }
+
+      catch (...)
+      {
+        return false;
+      }
+    }
+
+  inline
+  bool copy_file(const std::string& source, const std::string& destination)
+  {
+    boost::system::error_code ec;
+    boost::filesystem::copy_file(source, destination, ec);
+    if (ec)
+      return false;
+    else
+      return true;
+  }
 	inline
 		bool append_string_to_file(const std::string& path_to_file, const std::string& str)
 	{

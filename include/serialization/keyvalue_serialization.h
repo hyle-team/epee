@@ -29,7 +29,7 @@
 #include <boost/utility/value_init.hpp>
 #include <boost/foreach.hpp>
 #include "misc_log_ex.h"
-#include "enableable.h"
+#include "keyvalue_helpers.h"
 #include "keyvalue_serialization_overloads.h"
 namespace epee
 {
@@ -39,34 +39,47 @@ namespace epee
 #define BEGIN_KV_SERIALIZE_MAP() \
 public: \
   template<class t_storage> \
-  bool store( t_storage& st, typename t_storage::hsection hparent_section = nullptr) const\
+  bool store(t_storage& st, typename t_storage::hsection hparent_section = nullptr) const\
   {\
-  return serialize_map<true>(*this, st, hparent_section);\
-  }\
+  return serialize_map<true>(*this, st, hparent_section); \
+}\
   template<class t_storage> \
-  bool _load( t_storage& stg, typename t_storage::hsection hparent_section = nullptr)\
+  bool _load(t_storage& stg, typename t_storage::hsection hparent_section = nullptr)\
   {\
-  return serialize_map<false>(*this, stg, hparent_section);\
-  }\
+  return serialize_map<false>(*this, stg, hparent_section); \
+}\
   template<class t_storage> \
-  bool load( t_storage& stg, typename t_storage::hsection hparent_section = nullptr)\
+  bool load(t_storage& stg, typename t_storage::hsection hparent_section = nullptr)\
   {\
-    try{\
-    return serialize_map<false>(*this, stg, hparent_section);\
-    }\
-    catch(const std::exception& err) \
-    { \
-      (void)(err); \
-      LOG_ERROR("Exception on unserializing: " << err.what());\
-      return false; \
-    }\
+  try{\
+  return serialize_map<false>(*this, stg, hparent_section); \
+}\
+  catch (const std::exception& err) \
+  { \
+  (void)(err); \
+  LOG_ERROR("Exception on unserializing: " << err.what()); \
+  return false; \
   }\
+}\
   template<bool is_store, class this_type, class t_storage> \
-  static bool serialize_map(this_type& this_ref,  t_storage& stg, typename t_storage::hsection hparent_section) \
-  { 
+  static bool serialize_map(this_type& this_ref, t_storage& stg, typename t_storage::hsection hparent_section) \
+{
 
 #define KV_SERIALIZE_N(varialble, val_name) \
   epee::serialization::selector<is_store>::serialize(this_ref.varialble, stg, hparent_section, val_name);
+
+#define KV_SERIALIZE_CUSTOM_N(varialble, stored_type, from_v_to_stored, from_stored_to_v, val_name) \
+  epee::serialization::selector<is_store>::template serialize_custom<stored_type>(this_ref.varialble, stg, hparent_section, val_name, from_v_to_stored, from_stored_to_v);
+
+#define KV_SERIALIZE_EPHEMERAL_N(stored_type, from_v_to_stored, val_name) \
+  epee::serialization::selector<is_store>::template serialize_ephemeral<stored_type>(this_ref, stg, hparent_section, val_name, from_v_to_stored);
+
+
+#define KV_SERIALIZE_POD_AS_HEX_STRING_N(varialble, val_name) \
+	KV_SERIALIZE_CUSTOM_N(varialble, std::string, epee::transform_t_pod_to_str<decltype(varialble)>, epee::transform_str_to_t_pod<decltype(varialble)>, val_name)
+
+
+
 
 #define KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE_N(varialble, val_name) \
   epee::serialization::selector<is_store>::serialize_t_val_as_blob(this_ref.varialble, stg, hparent_section, val_name); 
@@ -84,12 +97,15 @@ public: \
 #define KV_SERIALIZE_VAL_POD_AS_BLOB(varialble)           KV_SERIALIZE_VAL_POD_AS_BLOB_N(varialble, #varialble)
 #define KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE(varialble)     KV_SERIALIZE_VAL_POD_AS_BLOB_FORCE_N(varialble, #varialble) //skip is_pod compile time check
 #define KV_SERIALIZE_CONTAINER_POD_AS_BLOB(varialble)     KV_SERIALIZE_CONTAINER_POD_AS_BLOB_N(varialble, #varialble)
+#define KV_SERIALIZE_CUSTOM(varialble, stored_type, from_v_to_stored, from_stored_to_v)    KV_SERIALIZE_CUSTOM_N(varialble, stored_type, from_v_to_stored, from_stored_to_v, #varialble)
+#define KV_SERIALIZE_POD_AS_HEX_STRING(varialble)         KV_SERIALIZE_POD_AS_HEX_STRING_N(varialble, #varialble)
+
 
 #define KV_CHAIN_MAP(variable_obj) epee::namespace_accessor<decltype(this_ref.variable_obj)>::template serialize_map<is_store>(this_ref.variable_obj, stg, hparent_section);
-#define KV_CHAIN_BASE(base_type) base_type::serialize_map<is_store>(static_cast<epee::get_type_const_or_nonconst<base_type&, is_store/*std::is_const<decltype(this_ref)>::value*/>::subtype>(this_ref), stg, hparent_section);
+#define KV_CHAIN_BASE(base_type) base_type::serialize_map<is_store>(static_cast<base_type&>(const_cast<typename std::remove_const<this_type>::type&>(this_ref)), stg, hparent_section);
+	
 
-//#define KV_CHAIN_BASE(base_type) base_type::serialize_map<is_store>(static_cast<base_type&>(this_ref), stg, hparent_section);  
-  
+
 
 
 

@@ -26,12 +26,12 @@
 
 #pragma once
 
+#include <deque>
+
 namespace epee
 {
   namespace serialization
   {
-
-    //-------------------------------------------------------------------------------------------------------------------
     template<class t_type, class t_storage>
     static bool serialize_t_val(const t_type& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
     {
@@ -125,8 +125,8 @@ namespace epee
     template<class stl_container, class t_storage>
     static bool serialize_stl_container_pod_val_as_blob(const stl_container& container, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
     {
+      static_assert(std::is_trivial<typename stl_container::value_type>::value, "Item supposed to be 'trivial'(trivially copyable)");
       if(!container.size()) return true;
-      typename stl_container::const_iterator it = container.begin();
       std::string mb;
       mb.resize(sizeof(typename stl_container::value_type)*container.size());
       typename stl_container::value_type* p_elem = (typename stl_container::value_type*)mb.data();
@@ -141,6 +141,7 @@ namespace epee
     template<class stl_container, class t_storage>
     static bool unserialize_stl_container_pod_val_as_blob(stl_container& container, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
     {
+      static_assert(std::is_trivial<typename stl_container::value_type>::value, "Item supposed to be 'trivial'(trivially copyable)");
       container.clear();
       std::string buff;
       bool res = stg.get_value(pname, buff, hparent_section);
@@ -239,6 +240,18 @@ namespace epee
         return unserialize_stl_container_t_val(d, stg, hparent_section, pname);
       } 
       //-------------------------------------------------------------------------------------------------------------------
+      template<class t_type, class t_storage>
+      static bool kv_serialize(const std::deque<t_type>& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
+      {
+        return serialize_stl_container_t_val(d, stg, hparent_section, pname);
+      }
+      //-------------------------------------------------------------------------------------------------------------------
+      template<class t_type, class t_storage>
+      static bool kv_unserialize(std::deque<t_type>& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
+      {
+        return unserialize_stl_container_t_val(d, stg, hparent_section, pname);
+      }
+      //-------------------------------------------------------------------------------------------------------------------
     };
     template<>
     struct kv_serialization_overloads_impl_is_base_serializable_types<false>
@@ -254,7 +267,6 @@ namespace epee
       {
         return unserialize_t_obj(d, stg, hparent_section, pname);
       } 
-
       //-------------------------------------------------------------------------------------------------------------------
       template<class t_type, class t_storage>
       static bool kv_serialize(const std::vector<t_type>& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
@@ -279,6 +291,18 @@ namespace epee
       {
         return unserialize_stl_container_t_obj(d, stg, hparent_section, pname);
       } 
+      //-------------------------------------------------------------------------------------------------------------------
+      template<class t_type, class t_storage>
+      static bool kv_serialize(const std::deque<t_type>& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
+      {
+        return serialize_stl_container_t_obj(d, stg, hparent_section, pname);
+      }
+      //-------------------------------------------------------------------------------------------------------------------
+      template<class t_type, class t_storage>
+      static bool kv_unserialize(std::deque<t_type>& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
+      {
+        return unserialize_stl_container_t_obj(d, stg, hparent_section, pname);
+      }
     };
     template<class t_storage>
     struct base_serializable_types: public boost::mpl::vector<uint64_t, uint32_t, uint16_t, uint8_t, int64_t, int32_t, int16_t, int8_t, double, bool, std::string, typename t_storage::meta_entry>::type 
@@ -305,7 +329,18 @@ namespace epee
       {
         return epee::serialization::serialize_t_val_as_blob(d, stg, hparent_section, pname);
       }
-
+      template< class t_type_stored, class t_type, class t_storage, typename cb_serialize, typename cb_unserialize>
+      static bool serialize_custom(const t_type& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname, cb_serialize cb_s, cb_unserialize cb_us)
+      {
+        t_type_stored a = cb_s(d);
+        return epee::serialization::selector<true>::serialize(a, stg, hparent_section, pname);
+      }
+      template< class t_type_stored, class t_type, class t_storage, typename cb_serialize>
+      static bool serialize_ephemeral(const t_type& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname, cb_serialize cb_s)
+      {
+        t_type_stored a = cb_s(d);
+        return epee::serialization::selector<true>::serialize(a, stg, hparent_section, pname);
+      }
 
     };
     template<>
@@ -326,6 +361,23 @@ namespace epee
       static bool serialize_t_val_as_blob(t_type& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
       {
         return epee::serialization::unserialize_t_val_as_blob(d, stg, hparent_section, pname);
+      }
+      template< class t_type_stored, class t_type, class t_storage, typename cb_serialize, typename cb_unserialize>
+      static bool serialize_custom(t_type& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname, cb_serialize cb_s, cb_unserialize cb_us)
+      {
+        t_type_stored a;
+        bool r = epee::serialization::selector<false>::serialize(a, stg, hparent_section, pname);
+        if (!r)
+          return r;
+        d = cb_us(a);
+        return r;
+      }
+
+      template< class t_type_stored, class t_type, class t_storage, typename cb_serialize>
+      static bool serialize_ephemeral(t_type& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname, cb_serialize cb_s)
+      {
+        //just a stub here
+        return true;
       }
     };
 
@@ -361,6 +413,18 @@ namespace epee
     //-------------------------------------------------------------------------------------------------------------------
     template<class t_type, class t_storage>
     bool kv_unserialize(std::list<t_type>& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
+    {
+      return kv_serialization_overloads_impl_is_base_serializable_types<boost::mpl::contains<base_serializable_types<t_storage>, typename std::remove_const<t_type>::type>::value>::kv_unserialize(d, stg, hparent_section, pname);
+    } 
+    //-------------------------------------------------------------------------------------------------------------------
+    template<class t_type, class t_storage>
+    bool kv_serialize(const std::deque<t_type>& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
+    {
+      return kv_serialization_overloads_impl_is_base_serializable_types<boost::mpl::contains<base_serializable_types<t_storage>, typename std::remove_const<t_type>::type>::value>::kv_serialize(d, stg, hparent_section, pname);
+    }
+    //-------------------------------------------------------------------------------------------------------------------
+    template<class t_type, class t_storage>
+    bool kv_unserialize(std::deque<t_type>& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
     {
       return kv_serialization_overloads_impl_is_base_serializable_types<boost::mpl::contains<base_serializable_types<t_storage>, typename std::remove_const<t_type>::type>::value>::kv_unserialize(d, stg, hparent_section, pname);
     } 

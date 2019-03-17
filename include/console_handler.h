@@ -266,24 +266,69 @@ namespace epee
         LOG_PRINT_L2("Read command: " << command);
         if(0 == command.compare("exit") || 0 == command.compare("q"))
         {
+          cmd_handler(command);
           continue_handle = false;
         }else if (!command.compare(0, 7, "set_log"))
         {
           //parse set_log command
-          if(command.size() != 9)
+          static const std::string command_wrong_syntax = "set_log: wrong syntax, usage: set_log log_level_number | log_channel_name_1,log_channel_name_2,... 0|1";
+          std::string args = epee::string_tools::trim(command.substr(7));
+          if (args.empty())
+          {
+            std::set<std::string>& enabled_channels = epee::log_space::log_singletone::get_enabled_channels();
+            std::cout << "current log level: " << log_space::get_set_log_detalisation_level() << ", enabled channels: ";
+            for(auto& channel : enabled_channels)
+              std::cout << channel << " ";
+            std::cout << std::endl;
+            continue;
+          }
+
+          size_t args_space_pos = args.find(' ');
+          if (args_space_pos != std::string::npos)
+          {
+            // channel enabling / disabling
+            std::string channel_str = args.substr(0, args_space_pos);
+            std::string value_str = args.substr(args_space_pos + 1);
+            if (channel_str.empty() || value_str.empty())
+            {
+              std::cout << command_wrong_syntax << std::endl;
+              continue;
+            }
+
+            bool multi_channels = channel_str.find_first_of(",;:") != std::string::npos;
+
+            if (value_str == "1" || value_str == "e" || value_str == "y")
+              if (multi_channels)
+                epee::log_space::log_singletone::enable_channels(channel_str);
+              else
+                epee::log_space::log_singletone::enable_channel(channel_str);
+            else
+              if (multi_channels)
+                epee::log_space::log_singletone::disable_channels(channel_str);
+              else
+                epee::log_space::log_singletone::disable_channel(channel_str);
+          }
+          else
+          {
+            // log level set
+            uint16_t n = 0;
+            if(!string_tools::get_xtype_from_string(n, args))
+            {
+              std::cout << command_wrong_syntax << std::endl;
+              continue;
+            }
+            uint16_t previous_log_level = log_space::get_set_log_detalisation_level();
+            log_space::get_set_log_detalisation_level(true, n);
+            if (n < LOG_LEVEL_2)
+              std::cout << "log level: " << previous_log_level << " -> " << n << std::endl;
+            LOG_PRINT_L2("log level: " << previous_log_level << " -> " << n);
+          }
+
+          if (args.empty())
           {
             std::cout << "wrong syntax: " << command << std::endl << "use set_log n" << std::endl;
             continue;
           }
-          uint16_t n = 0;
-          if(!string_tools::get_xtype_from_string(n, command.substr(8, 1)))
-          {
-            std::cout << "wrong syntax: " << command << std::endl << "use set_log n" << std::endl;
-            continue;
-          }
-          log_space::get_set_log_detalisation_level(true, n);
-          std::cout << "New log level set " << n;
-          LOG_PRINT_L2("New log level set " << n);
         }else if (command.empty())
         {
           continue;
@@ -377,6 +422,7 @@ namespace epee
     std::string get_usage()
     {
       std::stringstream ss;
+      ss << "Commands: " << ENDL;
       size_t max_command_len = 0;
       for(auto& x:m_command_handlers)
         if(x.first.size() > max_command_len)
@@ -385,7 +431,7 @@ namespace epee
       for(auto& x:m_command_handlers)
       {
         ss.width(max_command_len + 3);
-        ss << std::left <<  x.first << x.second.second << ENDL;
+        ss << "  " << std::left <<  x.first << " " << x.second.second << ENDL;
       }
       return ss.str();
     }
@@ -437,6 +483,11 @@ namespace epee
       return m_console_handler.run(boost::bind(&console_handlers_binder::process_command_str, this, _1), prompt, usage_string);
     }
 
+    bool help(const std::vector<std::string>& /*args*/)
+    {
+      std::cout << get_usage() << ENDL;
+      return true;
+    }
     /*template<class t_srv>
     bool run_handling(t_srv& srv, const std::string& usage_string)
     {
@@ -468,6 +519,8 @@ namespace epee
     {
       m_console_handler.stop();
     }
+
+    //--------------------------------------------------------------------------------
 
   private:
     async_console_handler m_console_handler;

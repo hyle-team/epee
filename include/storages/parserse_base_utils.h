@@ -68,17 +68,69 @@ namespace misc_utils
       }
       return res;
     }
+
+    /* Escapes JSON control characters and ASCII control characters (00h-1Fh => \u00XX) according to JSON reference.
+       UTF-8-safe.
+       from https://www.json.org/ :
+       char --  any-Unicode-character-except-"-or-\-or-control-character: \"  \\  \/  \b  \f  \n  \r  \t  \uDDDD
+    */
+    inline std::string transform_to_json_escape_sequence(const std::string& str)
+    {
+      std::string result;
+
+      static const char hex_map[17] = "0123456789abcdef";
+      static const std::string su00 = "\\u00";
+
+      const char* c_str = str.c_str();
+      for(size_t i = 0, len = str.length(); i < len; ++i)
+      {
+        char c = c_str[i];
+        switch(c)
+        {
+        case '\b':   // ASCII 08h
+          result += "\\b";
+          break;
+        case '\t':   // ASCII 09h
+          result += "\\t";
+          break;
+        case '\n':   // ASCII 0Ah
+          result += "\\n";
+          break;
+        case '\f':   // ASCII 0Ch
+          result += "\\f";
+          break;
+        case '\r':   // ASCII 0Dh
+          result += "\\r";
+          break;
+        case '"':    // ASCII 22h
+        case '\\':   // ASCII 5Ch
+        case '/':    // ASCII 2Fh
+          result.push_back('\\');
+          result.push_back(c);
+          break;
+
+        default:
+          if (static_cast<unsigned char>(c) < 0x20)
+            result += su00 + hex_map[(c >> 4) & 0xf] + hex_map[c & 0xf]; // encode all other control characters as \uDDDD
+          else
+            result.push_back(c);
+        }
+      }
+      return result;
+    }
+
     /*
       
-      \b  Backspace (ascii code 08)
-      \f  Form feed (ascii code 0C)
-      \n  New line
-      \r  Carriage return
-      \t  Tab
-      \v  Vertical tab
-      \'  Apostrophe or single quote
-      \"  Double quote
-      \\  Backslash character
+      \b     Backspace (ascii code 08)
+      \f     Form feed (ascii code 0C)
+      \n     New line
+      \r     Carriage return
+      \t     Tab
+      \v     Vertical tab
+      \'     Apostrophe or single quote
+      \"     Double quote
+      \\     Backslash character
+      \u00XY ASCII character with code 0xXY
 
       */
       inline void match_string2(std::string::const_iterator& star_end_string, std::string::const_iterator buf_end, std::string& val)
@@ -114,9 +166,33 @@ namespace misc_utils
               val.push_back('\\');break;
             case '/':  //Slash character
               val.push_back('/');break;
+            case 'u':  // \uDDDD sequence
+              {
+                bool ok = false;
+                size_t chars_left = buf_end - it - 1;
+                size_t chars_to_get = std::min(static_cast<size_t>(4), chars_left); // in [0, 4]
+                char tmp[10] = {0};
+                memcpy(tmp, &(*(it+1)), chars_to_get);
+                it = it + chars_to_get; // move forward to skip 0..4 digits
+                if (chars_to_get == 4)
+                {
+                  char *p_last_decoded_char = nullptr;
+                  unsigned long value = strtoul(tmp, &p_last_decoded_char, 16); // expected value is from 0x0000 (\u0000) to 0x00ff (\u00ff)
+                  if (value <= 0xff && p_last_decoded_char - tmp == 4)
+                  {
+                    val.push_back(static_cast<char>(value));
+                    ok = true;
+                  }
+                }
+                if (!ok)
+                {
+                  LOG_PRINT_L0("JSON invalid escape sequence: \\u" << tmp);
+                }
+              }
+              break;
             default:
               val.push_back(*it);
-              LOG_PRINT_L0("Unknown escape sequence :\"\\" << *it << "\"");
+              LOG_PRINT_L0("JSON unknown escape sequence :\"\\" << *it << "\"");
             }
             escape_mode = false;
           }else if(*it == '"')

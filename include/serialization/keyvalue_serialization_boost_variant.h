@@ -24,26 +24,44 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
+#pragma once
 
+#include <boost/variant.hpp>
 
-#ifndef _MUNIN_NODE_SERVER_H_
-#define _MUNIN_NODE_SERVER_H_
-
-#include <string>
-//#include "net_utils_base.h"
-#include "munin_connection_handler.h"
-//#include "abstract_tcp_server.h"
-//#include "abstract_tcp_server_cp.h"
-#include "abstract_tcp_server2.h"
 namespace epee
 {
-namespace net_utils
-{
-	namespace munin
-	{
-		typedef boosted_tcp_server<munin_node_server_connection_handler> munin_node_server;
-		//typedef cp_server_impl<munin_node_server_connection_handler> munin_node_cp_server;
-	}
+  namespace serialization
+  {
+
+    template<class t_storage>
+    struct serialize_variant_visitor : public boost::static_visitor<bool>
+    {
+      serialize_variant_visitor(t_storage& rstg, typename t_storage::hsection hsection, const char* pn)
+      :stg(rstg), hparent_section(hsection), pname(pn)
+      {}
+      t_storage& stg;
+      typename t_storage::hsection hparent_section;
+      const char* pname;
+
+      template<class t_type>
+      bool operator()(const t_type& v) const
+      {
+        return kv_serialization_overloads_impl_is_base_serializable_types<boost::mpl::contains<base_serializable_types<t_storage>, typename std::remove_const<t_type>::type>::value>::kv_serialize(v, stg, hparent_section, pname);
+      }
+    };
+
+    template<class t_storage, typename t_type, typename... rest>
+    bool kv_serialize(const boost::variant<t_type, rest...>& d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
+    {
+      serialize_variant_visitor<t_storage> sv(stg, hparent_section, pname);
+      return boost::apply_visitor(sv, d);
+    }
+    //-------------------------------------------------------------------------------------------------------------------
+    template<class t_storage, typename t_type, typename... rest>
+    bool kv_unserialize(boost::variant<t_type, rest... > &d, t_storage& stg, typename t_storage::hsection hparent_section, const char* pname)
+    {
+      LOG_ERROR("kv_unserialize on boost::variant call not allowed");
+      return false;
+    }
+  }
 }
-}
-#endif//!_MUNIN_NODE_SERVER_H_

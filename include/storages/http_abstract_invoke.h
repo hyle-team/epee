@@ -109,7 +109,7 @@ namespace epee
       }
       if(resp_t.error.code || resp_t.error.message.size())
       {
-        LOG_ERROR("RPC call of \"" << method_name << "\" returned error: " << resp_t.error.code << ", message: " << resp_t.error.message);
+        LOG_PRINT_L0("RPC call of \"" << method_name << "\" returned error: " << resp_t.error.code << ", message: " << resp_t.error.message);
         return false;
       }
       result_struct = resp_t.result;

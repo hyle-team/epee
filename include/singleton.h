@@ -1,4 +1,5 @@
-// Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
+
+// Copyright (c) 2006-2018, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
 // 
 // Redistribution and use in source and binary forms, with or without
@@ -26,24 +27,58 @@
 
 
 
-#ifndef _MUNIN_NODE_SERVER_H_
-#define _MUNIN_NODE_SERVER_H_
 
-#include <string>
-//#include "net_utils_base.h"
-#include "munin_connection_handler.h"
-//#include "abstract_tcp_server.h"
-//#include "abstract_tcp_server_cp.h"
-#include "abstract_tcp_server2.h"
-namespace epee
+#pragma once
+
+#include <memory>
+
+
+template<class owned_object_t>
+class abstract_singleton
 {
-namespace net_utils
-{
-	namespace munin
-	{
-		typedef boosted_tcp_server<munin_node_server_connection_handler> munin_node_server;
-		//typedef cp_server_impl<munin_node_server_connection_handler> munin_node_cp_server;
-	}
-}
-}
-#endif//!_MUNIN_NODE_SERVER_H_
+
+  static std::shared_ptr<owned_object_t> get_set_instance_internal(bool is_need_set = false, owned_object_t* pnew_obj = nullptr)
+  {
+    static std::shared_ptr<owned_object_t> val_pobj;
+
+    if (is_need_set)
+      val_pobj.reset(pnew_obj);
+
+    return val_pobj;
+  }
+
+  static bool get_is_deinitialized(bool need_to_set = false, bool val_to_set = false)
+  {
+    static bool is_deintialized = false;
+    if (need_to_set)
+      is_deintialized = val_to_set;
+    return is_deintialized;
+  }
+
+
+public:
+  inline static bool init()
+  {
+    //better to call before multiple threads start to call it
+    get_instance();
+    return true;/*do nothing here*/
+  }
+  inline static bool un_init()
+  {
+    get_is_deinitialized(true, true);
+    get_set_instance_internal(true, nullptr);
+    return true;
+  }
+
+  static std::shared_ptr<owned_object_t> get_instance()
+  {
+    std::shared_ptr<owned_object_t> val_pobj = get_set_instance_internal();
+    if (!val_pobj.get() && !get_is_deinitialized())
+    {
+      owned_object_t*pnewobj = new owned_object_t();
+      get_set_instance_internal(true, pnewobj);
+      val_pobj = get_set_instance_internal();
+    }
+    return val_pobj;
+  }
+};

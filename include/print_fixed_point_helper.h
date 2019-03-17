@@ -1,6 +1,6 @@
-// Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
+// Copyright (c) 2006-2017, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are met:
 // * Redistributions of source code must retain the above copyright
@@ -11,7 +11,7 @@
 // * Neither the name of the Andrey N. Sabelnikov nor the
 // names of its contributors may be used to endorse or promote products
 // derived from this software without specific prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
 // ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
 // WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -22,28 +22,24 @@
 // ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-// 
+//
 
 
+#pragma once
 
-#ifndef _MUNIN_NODE_SERVER_H_
-#define _MUNIN_NODE_SERVER_H_
-
-#include <string>
-//#include "net_utils_base.h"
-#include "munin_connection_handler.h"
-//#include "abstract_tcp_server.h"
-//#include "abstract_tcp_server_cp.h"
-#include "abstract_tcp_server2.h"
 namespace epee
 {
-namespace net_utils
-{
-	namespace munin
-	{
-		typedef boosted_tcp_server<munin_node_server_connection_handler> munin_node_server;
-		//typedef cp_server_impl<munin_node_server_connection_handler> munin_node_cp_server;
-	}
+  namespace string_tools
+  {
+    inline std::string print_fixed_decimal_point(uint64_t amount, size_t decimal_point)
+    {
+      std::string s = std::to_string(amount);
+      if (s.size() < decimal_point + 1)
+      {
+        s.insert(0, decimal_point + 1 - s.size(), '0');
+      }
+      s.insert(s.size() - decimal_point, ".");
+      return s;
+    }
+  }
 }
-}
-#endif//!_MUNIN_NODE_SERVER_H_

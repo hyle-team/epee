@@ -1,4 +1,4 @@
-// Copyright (c) 2006-2013, Andrey N. Sabelnikov, www.sabelnikov.net
+// Copyright (c) 2006-2017, Andrey N. Sabelnikov, www.sabelnikov.net
 // All rights reserved.
 // 
 // Redistribution and use in source and binary forms, with or without
@@ -25,25 +25,10 @@
 // 
 
 
+#pragma once
+#include <boost/utility/value_init.hpp>
 
-#ifndef _MUNIN_NODE_SERVER_H_
-#define _MUNIN_NODE_SERVER_H_
 
-#include <string>
-//#include "net_utils_base.h"
-#include "munin_connection_handler.h"
-//#include "abstract_tcp_server.h"
-//#include "abstract_tcp_server_cp.h"
-#include "abstract_tcp_server2.h"
-namespace epee
-{
-namespace net_utils
-{
-	namespace munin
-	{
-		typedef boosted_tcp_server<munin_node_server_connection_handler> munin_node_server;
-		//typedef cp_server_impl<munin_node_server_connection_handler> munin_node_cp_server;
-	}
-}
-}
-#endif//!_MUNIN_NODE_SERVER_H_
+
+#define AUTO_VAL_INIT(v)   boost::value_initialized<decltype(v)>()
+#define AUTO_VAL_INIT_T(t)   boost::value_initialized<t>()

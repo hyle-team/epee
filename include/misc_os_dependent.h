@@ -51,7 +51,11 @@ namespace misc_utils
         inline uint64_t get_tick_count()
         {
 #if defined(_MSC_VER)
-                return ::GetTickCount64();
+          typedef ULONGLONG(*GetTickCount64Ptr)();
+          static GetTickCount64Ptr get_tick_count64 = (GetTickCount64Ptr)(GetProcAddress(GetModuleHandleA("kernel32.dll"), "GetTickCount64"));
+          if (get_tick_count64)
+            return (*get_tick_count64)();
+          return GetTickCount();
 #elif defined(__MACH__)
                 clock_serv_t cclock;
                 mach_timespec_t mts;
@@ -104,5 +108,31 @@ namespace misc_utils
 		return boost::lexical_cast<std::string>(pthread_self());
 #endif
 	}
+
+#if defined(__GNUC__)
+#include <execinfo.h>
+#include <boost/core/demangle.hpp>
+#endif
+  inline std::string print_trace()
+  {
+    std::stringstream ss;
+#if defined(__GNUC__)
+    ss << std::endl << "STACK" << std::endl;
+    const size_t max_depth = 100;
+    size_t stack_depth;
+    void *stack_addrs[max_depth];
+    char **stack_strings;
+
+    stack_depth = backtrace(stack_addrs, max_depth);
+    stack_strings = backtrace_symbols(stack_addrs, stack_depth);
+
+    for (size_t i = 1; i < stack_depth; i++) 
+    {      
+      ss << boost::core::demangle(stack_strings[i]) << std::endl;
+    }
+    free(stack_strings); // malloc()ed by backtrace_symbols
+#endif
+    return ss.str();
+  }
 }
 }
